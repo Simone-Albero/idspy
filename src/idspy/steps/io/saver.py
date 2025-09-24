@@ -7,7 +7,7 @@ from ...core.step import Step
 from ...core.state import State
 from ...data.repository import DataFrameRepository
 from ...nn.models.base import BaseModel
-from ...nn.io import save_weights, save_checkpoint
+from ...nn.io import save_weights
 
 
 class SaveData(Step):
@@ -23,7 +23,7 @@ class SaveData(Step):
         name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        self.file_path: Path = Path(file_path)
+        self.file_path = file_path
         self.fmt = fmt
         self.file_name = file_name
         self.save_meta = save_meta
@@ -46,24 +46,30 @@ class SaveData(Step):
         )
 
 
-class SaveModel(Step):
+class SaveModelWeights(Step):
     """Save model from state."""
 
     def __init__(
         self,
-        path_out: Union[str, Path],
-        in_scope: Optional[str] = None,
+        file_path: Union[str, Path],
+        fmt: Optional[str] = None,
+        file_name: Optional[str] = None,
+        in_scope: str = "",
         name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        self.path_out: Path = Path(path_out)
+        self.file_path = file_path
+        self.fmt = fmt
+        self.file_name = file_name
         self.kwargs = kwargs
 
         super().__init__(
-            name=name or "save_model",
+            name=name or "save_model_weights",
             in_scope=in_scope,
         )
 
     @Step.requires(model=BaseModel)
     def run(self, state: State, model: BaseModel) -> None:
-        save_weights(model, self.path_out, **self.kwargs)
+        save_weights(
+            model, self.file_path, name=self.file_name, fmt=self.fmt, **self.kwargs
+        )

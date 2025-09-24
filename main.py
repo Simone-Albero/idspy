@@ -19,8 +19,8 @@ from src.idspy.events.bus import EventBus
 from src.idspy.events.events import only_id
 from src.idspy.events.handlers.logging import Logger, DataFrameProfiler
 
-from src.idspy.steps.io.saver import SaveData
-from src.idspy.steps.io.loader import LoadData
+from src.idspy.steps.io.saver import SaveData, SaveModelWeights
+from src.idspy.steps.io.loader import LoadData, LoadModelWeights
 from src.idspy.steps.builders.dataloader import BuildDataLoader
 from src.idspy.steps.builders.dataset import BuildDataset
 from src.idspy.steps.transforms.adjust import DropNulls
@@ -31,11 +31,13 @@ from src.idspy.steps.transforms.split import (
     StratifiedSplit,
     AssignSplitTarget,
 )
+
 from src.idspy.steps.model.training import TrainOneEpoch
 from src.idspy.steps.model.evaluating import ValidateOneEpoch, MakePredictions
 from src.idspy.steps.metrics.classification import ClassificationMetrics
 
-from src.idspy.nn.batch import default_collate, Batch
+
+from src.idspy.nn.batch import default_collate
 from src.idspy.nn.helpers import get_device
 from src.idspy.nn.models.classifier import TabularClassifier
 from src.idspy.nn.losses.classification import ClassificationLoss
@@ -122,7 +124,7 @@ def main():
     preprocessing_pipeline = ObservablePipeline(
         steps=[
             LoadData(
-                path_in="resources/data/dataset_v2/cic_2018_v2.csv",
+                file_path="resources/data/dataset_v2/cic_2018_v2.csv",
                 schema=schema,
             ),
             DropNulls(),
@@ -141,7 +143,7 @@ def main():
 
     training_pipeline = ObservablePipeline(
         steps=[
-            LoadData(path_in="resources/data/processed/cic_2018_v2.parquet"),
+            LoadData(file_path="resources/data/processed/cic_2018_v2.parquet"),
             AssignSplitPartitions(),
             AssignSplitTarget(in_scope="data", out_scope="test"),
             BuildDataset(out_scope="train"),
@@ -162,6 +164,7 @@ def main():
                 collate_fn=default_collate,
             ),
             TrainOneEpoch(),
+            SaveModelWeights(file_path="resources/models/cic_2018_v2/model.pt"),
             ValidateOneEpoch(in_scope="test", out_scope="test", save_outputs=True),
             MakePredictions(pred_fn=lambda x: torch.argmax(x, dim=1)),
             ClassificationMetrics(),

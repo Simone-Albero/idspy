@@ -5,15 +5,16 @@ from ..common.path import PathUtils, PathLike
 
 
 def save_checkpoint(
-    path: PathLike,
     model: nn.Module,
+    base_path: PathLike,
+    name: Optional[str] = None,
+    fmt: Optional[str] = "pt",
     optimizer: Optional[torch.optim.Optimizer] = None,
     scheduler: Optional[Any] = None,
     extra: Optional[Dict[str, Any]] = None,
-    fmt: Optional[str] = "pt",
 ) -> None:
     """Save model, optimizer, scheduler, and extra data to a file."""
-    final_path, _ = PathUtils.resolve_path_and_format(path, fmt=fmt)
+    final_path, _ = PathUtils.resolve_path_and_format(base_path, name=name, fmt=fmt)
     PathUtils.ensure_dir_exists(final_path)
     unwrapped = getattr(model, "module", model)
     payload: Dict[str, Any] = {"model": unwrapped.state_dict()}
@@ -27,15 +28,17 @@ def save_checkpoint(
 
 
 def load_checkpoint(
-    path: PathLike,
     model: nn.Module,
+    base_path: PathLike,
+    name: Optional[str] = None,
+    fmt: Optional[str] = "pt",
     optimizer: Optional[torch.optim.Optimizer] = None,
     scheduler: Optional[Any] = None,
     strict: bool = False,
     map_location: Union[str, torch.device] = "cpu",
 ) -> Dict[str, Any]:
     """Load model, optimizer, scheduler, and extra data from a file."""
-    final_path, _ = PathUtils.resolve_path_and_format(path)
+    final_path, _ = PathUtils.resolve_path_and_format(base_path, name=name, fmt=fmt)
     payload = torch.load(final_path, map_location=map_location)
     state_dict = payload.get("model", payload)
     unwrapped = getattr(model, "module", model)
@@ -59,22 +62,29 @@ def load_checkpoint(
     return payload.get("extra", {})
 
 
-def save_weights(path: PathLike, model: nn.Module, fmt: Optional[str] = "pt") -> None:
+def save_weights(
+    model: nn.Module,
+    base_path: PathLike,
+    name: Optional[str] = None,
+    fmt: Optional[str] = "pt",
+) -> None:
     """Save only model weights to a file."""
-    final_path, _ = PathUtils.resolve_path_and_format(path, fmt=fmt)
+    final_path, _ = PathUtils.resolve_path_and_format(base_path, name=name, fmt=fmt)
     PathUtils.ensure_dir_exists(final_path)
     unwrapped = getattr(model, "module", model)
     torch.save(unwrapped.state_dict(), final_path)
 
 
 def load_weights(
-    path: PathLike,
     model: nn.Module,
+    base_path: PathLike,
+    name: Optional[str] = None,
+    fmt: Optional[str] = "pt",
     strict: bool = False,
     map_location: Union[str, torch.device] = "cpu",
 ) -> Tuple[set, set]:
     """Load only model weights from a file."""
-    final_path, _ = PathUtils.resolve_path_and_format(path)
+    final_path, _ = PathUtils.resolve_path_and_format(base_path, name=name, fmt=fmt)
     state = torch.load(final_path, map_location=map_location)
     state_dict = (
         state["model"] if isinstance(state, dict) and "model" in state else state

@@ -20,7 +20,7 @@ class ValidateOneEpoch(Step):
         self,
         log_dir: Optional[str] = None,
         log_prefix: str = "val",
-        save_history: bool = False,
+        save_history: bool = True,
         save_outputs: bool = False,
         in_scope: str = "val",
         out_scope: Optional[str] = "val",
