@@ -30,7 +30,7 @@ class State:
         # Check existing value type compatibility
         if key in self._data:
             existing_type = type(self._data[key])
-            if existing_type is not typ:
+            if not issubclass(existing_type, typ):
                 raise TypeError(
                     f"Key '{key}' already exists with type {existing_type.__name__}, not {typ.__name__}"
                 )

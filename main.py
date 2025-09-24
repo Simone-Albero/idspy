@@ -6,10 +6,12 @@ from src.idspy.common.logging import setup_logging
 from src.idspy.common.seeds import set_seeds
 
 from src.idspy.core.state import State
+from src.idspy.core.step import Step
 from src.idspy.core.pipeline import (
     FitAwareObservablePipeline,
     ObservablePipeline,
     PipelineEvent,
+    RepeatableObservablePipeline,
 )
 
 from src.idspy.data.schema import Schema, ColumnRole
@@ -34,6 +36,7 @@ from src.idspy.steps.transforms.split import (
 
 from src.idspy.steps.model.training import TrainOneEpoch
 from src.idspy.steps.model.evaluating import ValidateOneEpoch, MakePredictions
+from src.idspy.steps.model.early_stopping import EarlyStopping
 from src.idspy.steps.metrics.classification import ClassificationMetrics
 
 
@@ -141,7 +144,8 @@ def main():
         name="preprocessing_pipeline",
     )
 
-    training_pipeline = ObservablePipeline(
+    training_pipeline = RepeatableObservablePipeline(
+        count=100,
         steps=[
             LoadData(file_path="resources/data/processed/cic_2018_v2.parquet"),
             AssignSplitPartitions(),
@@ -155,19 +159,20 @@ def main():
                 shuffle=True,
                 collate_fn=default_collate,
             ),
-            BuildDataset(out_scope="test"),
+            BuildDataset(out_scope="val"),
             BuildDataLoader(
-                in_scope="test",
-                out_scope="test",
+                in_scope="val",
+                out_scope="val",
                 batch_size=1024,
                 shuffle=False,
                 collate_fn=default_collate,
             ),
             TrainOneEpoch(),
-            SaveModelWeights(file_path="resources/models/cic_2018_v2/model.pt"),
-            ValidateOneEpoch(in_scope="test", out_scope="test", save_outputs=True),
-            MakePredictions(pred_fn=lambda x: torch.argmax(x, dim=1)),
-            ClassificationMetrics(),
+            # SaveModelWeights(file_path="resources/models/cic_2018_v2/model.pt"),
+            ValidateOneEpoch(in_scope="val", out_scope="val", save_outputs=True),
+            EarlyStopping(),
+            # MakePredictions(pred_fn=lambda x: torch.argmax(x, dim=1)),
+            # ClassificationMetrics(),
         ],
         bus=bus,
         name="training_pipeline",
@@ -190,6 +195,7 @@ def main():
             "loss": loss,
             "optimizer": optimizer,
             "seed": 42,
+            "stop_pipeline": False,
         }
     )
 

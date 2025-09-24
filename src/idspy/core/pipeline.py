@@ -10,7 +10,7 @@ from typing import (
     Mapping,
 )
 
-from .state import State
+from .state import State, key_is_falsy
 from .step import Step, FitAwareStep
 from ..events.bus import EventBus
 from ..events.events import Event
@@ -241,3 +241,39 @@ class FitAwareObservablePipeline(FitAwarePipeline, ObservablePipeline):
     ) -> None:
         # cooperative MRO: both parents call super().__init__
         super().__init__(steps, bus=bus, refit=refit, **kwargs)
+
+
+class RepeatablePipeline(Pipeline):
+    """Pipeline that repeats its steps a fixed number of times."""
+
+    def __init__(
+        self,
+        count: int,
+        steps: Sequence[Step],
+        **kwargs: Any,
+    ) -> None:
+        self.count = count
+        super().__init__(steps, **kwargs)
+
+    @Step.repeat(predicate=key_is_falsy("stop_pipeline"))
+    def run(self, state: State, **kwargs) -> None:
+        for i in range(self.count):
+            super().run(state, **kwargs)
+
+    def __repr__(self) -> str:
+        base = super().__repr__().rstrip(")")
+        return f"{base}, count={self.count})"
+
+
+class RepeatableObservablePipeline(RepeatablePipeline, ObservablePipeline):
+    """RepeatablePipeline that also publishes events."""
+
+    def __init__(
+        self,
+        count: int,
+        steps: Sequence[Step],
+        bus: Optional[EventBus] = None,
+        **kwargs: Any,
+    ) -> None:
+        # cooperative MRO: both parents call super().__init__
+        super().__init__(count, steps, bus=bus, **kwargs)
