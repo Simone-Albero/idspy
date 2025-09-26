@@ -3,7 +3,7 @@ import logging
 import torch
 
 from src.idspy.common.logging import setup_logging
-from src.idspy.common.seeds import set_seeds
+from src.idspy.common.utils import set_seeds
 
 from src.idspy.core.state import State
 from src.idspy.core.step import Step

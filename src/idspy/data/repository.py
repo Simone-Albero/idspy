@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union
 
 import pandas as pd
 
-from ..common.path import PathUtils, PathLike
+from ..common.utils import PathUtils, PathLike
 from .schema import Schema
 from .tab_accessor import TabAccessor
 

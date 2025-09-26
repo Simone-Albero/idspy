@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional, Tuple, Union
 import torch
 from torch import nn
-from ..common.path import PathUtils, PathLike
+from ..common.utils import PathUtils, PathLike
 
 
 def save_checkpoint(

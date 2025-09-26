@@ -1,5 +1,9 @@
 from pathlib import Path
-from typing import Optional, Tuple, Union, List
+import random
+from typing import Optional, Tuple, Union
+
+import numpy as np
+import torch
 
 PathLike = Union[str, Path]
 
@@ -73,3 +77,12 @@ class PathUtils:
         Ensure the directory for the given path exists.
         """
         Path(path).parent.mkdir(parents=True, exist_ok=True)
+
+
+def set_seeds(seed: int) -> None:
+    """Set seeds for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False

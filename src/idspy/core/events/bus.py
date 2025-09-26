@@ -1,35 +1,12 @@
 import logging
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Final, Union
+from typing import Callable, Dict, List, Optional, Final, Union, Any
 
-from .events import Event
+from .event import Event, EventPredicate
+from .handler import BaseHandler
 
+Handler = Union[BaseHandler, Callable[[Event], None]]
 logger = logging.getLogger(__name__)
-
-
-class BaseHandler(ABC):
-    """Abstract base class for event handlers."""
-
-    @abstractmethod
-    def handle(self, event: Event) -> None:
-        """Process the event."""
-        pass
-
-    @abstractmethod
-    def can_handle(self, event: Event) -> bool:
-        """Check if this handler can process the event. Override for custom logic."""
-        return True
-
-    def __call__(self, event: Event) -> None:
-        """Make handler callable like the original function-based approach."""
-        if self.can_handle(event):
-            self.handle(event)
-
-
-FunctionHandler = Callable[[Event], None]
-Handler = Union[BaseHandler, FunctionHandler]
-Predicate = Callable[[Event], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,13 +14,13 @@ class _Entry:
     """Subscription entry."""
 
     callback: Handler
-    predicate: Optional[Predicate]
+    predicate: Optional[EventPredicate]
     token: int  # unique id for unsubscription
     priority: int
 
 
 class EventBus:
-    """Minimal synchronous event bus."""
+    """"""
 
     ALL: Final[Optional[str]] = None  # subscribe to all events
 
@@ -55,7 +32,7 @@ class EventBus:
         self,
         callback: Handler,
         event_type: Optional[str] = None,
-        predicate: Optional[Predicate] = None,
+        predicate: Optional[EventPredicate] = None,
         priority: int = 1,
     ) -> int:
         """Register callback; returns a token."""
@@ -69,7 +46,7 @@ class EventBus:
     def on(
         self,
         event_type: Optional[str] = None,
-        predicate: Optional[Predicate] = None,
+        predicate: Optional[EventPredicate] = None,
         priority: int = 1,
     ) -> Callable[[Handler], Handler]:
         """Decorator to subscribe a handler."""
@@ -95,13 +72,16 @@ class EventBus:
                     self._subs.pop(key, None)
         return removed
 
-    def publish(self, event: Event) -> None:
+    def publish(
+        self, source: str, payload: Dict[str, Any], event_type: Optional[str] = None
+    ) -> None:
         """Dispatch event to subscribers; log handler errors."""
         targets: List[_Entry] = []
-        targets.extend(self._subs.get(event.type, ()))
+        targets.extend(self._subs.get(event_type, ()))
         targets.extend(self._subs.get(self.ALL, ()))
 
         targets.sort(key=lambda entry: entry.priority)
+        event = Event(type=event_type or "unknown", source=source, payload=payload)
 
         for entry in list(targets):
             try:
