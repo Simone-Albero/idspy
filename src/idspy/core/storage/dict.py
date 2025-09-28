@@ -1,37 +1,19 @@
-from typing import Any, Dict, Mapping, Sequence
+from typing import Any, Dict, Mapping, Optional, Sequence
 
-from .base import Storage, Port
+from .base import Storage
 
 
 class DictStorage(Storage):
     """A Storage implementation that uses a plain dictionary internally."""
 
-    def __init__(self) -> None:
-        self._data: Dict[str, Any] = {}
+    def __init__(self, data: Optional[Mapping[str, Any]] = None) -> None:
+        self._data: Dict[str, Any] = dict(data) if data else {}
 
-    def get(self, ports: Sequence[Port]) -> Dict[str, Any]:
-        result: Dict[str, Any] = {}
-        for port in ports:
-            if port.name not in self._data:
-                raise KeyError(f"Port '{port.name}' not found in storage.")
-            value = self._data[port.name]
-            if not isinstance(value, port.dtype) and port.dtype is not Any:
-                raise TypeError(
-                    f"Type mismatch for port '{port.name}': expected {port.dtype}, got {type(value)}"
-                )
-            result[port.name] = value
-        return result
+    def get(self, keys: Sequence[str]) -> Dict[str, Any]:
+        return {k: self._data[k] for k in keys if k in self._data}
 
     def set(self, values: Mapping[str, Any]) -> None:
-        for name, value in values.items():
-            if name in self._data:
-                existing_value = self._data[name]
-                if type(existing_value) != type(value):
-                    raise TypeError(
-                        f"Type mismatch for port '{name}': existing type {type(existing_value)}, new type {type(value)}"
-                    )
-
-            self._data[name] = value
+        self._data.update(values)
 
     def has(self, name: str) -> bool:
         return name in self._data

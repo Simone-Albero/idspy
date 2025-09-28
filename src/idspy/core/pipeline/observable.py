@@ -1,5 +1,4 @@
-from typing import Any, Sequence, Dict, Mapping
-from types import MappingProxyType
+from typing import Any, Sequence, Dict
 
 from .base import Pipeline, PipelineEvent
 from ..step.base import Step

@@ -1,8 +1,9 @@
 from enum import Enum, auto
 from collections import defaultdict
-from typing import Any, Mapping, Sequence, Dict, List, Optional
+from typing import Any, Sequence, Dict, List, Optional
 
-from ..storage.base import Storage, Port
+from ..storage.base import Storage
+from ..storage.proxy import BindedStorage
 from ..step.base import Step
 
 
@@ -14,21 +15,10 @@ class PipelineEvent(Enum):
     STEP_ERROR = auto()
 
 
-def _ensure_outputs_match_ports(
-    outputs: Mapping[str, Any], ports: Sequence[Port]
-) -> None:
-    port_names = {p.name for p in ports}
-    missing = port_names - set(outputs.keys())
-    if missing:
-        raise ValueError(f"Step did not return values for ports: {sorted(missing)}")
-
-
 class Pipeline(Step):
     """
-    A pipeline is itself a Step. It runs child steps in order, using Storage:
-        inputs  = storage.get(step.required_ports)
-        outputs = step.run(inputs)
-        storage.set(outputs)
+    A pipeline is itself a Step. It runs child steps in order, using Storage.
+    Optionally binds step keys to storage keys.
 
     Emits hooks at key points:
 
@@ -90,29 +80,6 @@ class Pipeline(Step):
             except Exception as e:
                 raise e
 
-    @property
-    def required_ports(self) -> Sequence[Port]:
-        """Ports needed externally before the first run (not produced by earlier steps)."""
-        produced: set[Port] = set()
-        needed: set[Port] = set()
-        for step in self._steps:
-            for p in step.required_ports:
-                if p.name not in {q.name for q in produced} and p.name not in {
-                    q.name for q in needed
-                }:
-                    needed.append(p)
-            produced.update(step.provided_ports)
-        return needed
-
-    @property
-    def provided_ports(self) -> Sequence[Port]:
-        """All ports produced by the pipeline after completion."""
-        out_by_name: Dict[str, Port] = {}
-        for step in self._steps:
-            for p in step.provided_ports:
-                out_by_name[p.name] = p
-        return list(out_by_name.values())
-
     def run(self, **kwargs: Any) -> Dict[str, Any]:
         """
         Execute all steps sequentially using storage for I/O.
@@ -125,7 +92,9 @@ class Pipeline(Step):
 
         try:
             for idx, step in enumerate(self._steps):
-                inputs = self._storage.get(step.required_ports)
+                storage = BindedStorage(self._storage, step.get_bindings() or {})
+
+                inputs = storage.get(step.requires)
                 self._emit(
                     PipelineEvent.STEP_START, step=step, index=idx, inputs=inputs
                 )
@@ -135,8 +104,8 @@ class Pipeline(Step):
                     # hook first, then re-raise
                     self._emit(PipelineEvent.STEP_ERROR, step=step, index=idx, error=e)
                     raise
-                _ensure_outputs_match_ports(outputs, step.provided_ports)
-                self._storage.set(outputs)
+
+                storage.set(outputs)
                 self._emit(
                     PipelineEvent.STEP_END,
                     step=step,

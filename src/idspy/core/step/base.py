@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Sequence, Dict, Optional
 
-from ..storage.base import Port
-
 
 class Step(ABC):
     """Abstract unit of work with typed inputs and outputs."""
@@ -10,14 +8,22 @@ class Step(ABC):
     def __init__(self, name: Optional[str] = None) -> None:
         self.name = name or self.__class__.__name__
 
+    @classmethod
+    def requires(cls, *requirements: str):
+        def decorator(subcls):
+            subcls._requires = tuple(requirements)
+            return subcls
+
+        return decorator
+
     @property
-    @abstractmethod
-    def required_ports(self) -> Sequence[Port]:
-        raise NotImplementedError
+    def requires(self) -> Sequence[str]:
+        return getattr(self.__class__, "_requires", ())
 
     @property
     @abstractmethod
-    def provided_ports(self) -> Sequence[Port]:
+    def get_bindings(self) -> Dict[str, str]:
+        """Return a mapping of port name to bound key, if any."""
         raise NotImplementedError
 
     @abstractmethod
