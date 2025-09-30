@@ -3,34 +3,35 @@ from typing import Optional, Dict, Any
 import numpy as np
 import pandas as pd
 
-from ...core.step import FitAwareStep, Step
-from ...core.state import State
+from ...core.step.base import Step
+from ...core.step.fittable import FittableStep
 
 
-class StandardScale(FitAwareStep):
+@Step.needs("df")
+class StandardScale(FittableStep):
     """Standardize numerical columns using mean/std with overflow-safe scaling."""
 
     def __init__(
         self,
-        in_scope: str = "data",
-        out_scope: str = "data",
+        df_key: str = "data.base_df",
         name: Optional[str] = None,
     ) -> None:
         self._scale: Optional[pd.Series] = None
         self._means_s: Optional[pd.Series] = None
         self._stds_s: Optional[pd.Series] = None
 
-        super().__init__(
-            name=name or "standard_scale",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "standard_scale")
+        self.key_map = {
+            "df": df_key,
+        }
 
-    @Step.requires(root=pd.DataFrame)
-    def fit_impl(self, state: State, root: pd.DataFrame) -> None:
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def fit_impl(self, df: pd.DataFrame) -> None:
         """Fit scaling stats on train split (overflow-safe)."""
 
-        numerical_data = root.tab.train.tab.numerical
+        numerical_data = df.tab.train.tab.numerical
         if numerical_data.shape[1] == 0:
             self._scale = pd.Series(dtype="float64")
             self._means_s = pd.Series(dtype="float64")
@@ -51,14 +52,12 @@ class StandardScale(FitAwareStep):
         self._means_s = num_scaled.mean()
         self._stds_s = num_scaled.std(ddof=0).clip(lower=1e-10, upper=None)
 
-    @Step.requires(root=pd.DataFrame)
-    @Step.provides(root=pd.DataFrame)
-    def run(self, state: State, root: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """Apply standardization to numerical columns."""
 
-        numerical_data = root.tab.numerical
+        numerical_data = df.tab.numerical
         if numerical_data.shape[1] == 0:
-            return {"root": root}
+            return {"df": df}
 
         numerical_data = numerical_data.astype(np.float64, copy=False).replace(
             [np.inf, -np.inf], np.nan
@@ -69,32 +68,33 @@ class StandardScale(FitAwareStep):
         means_s = self._means_s.reindex(cols, fill_value=0.0)
         stds_s = self._stds_s.reindex(cols, fill_value=1.0)
 
-        root.tab.numerical = (numerical_data / scale - means_s) / stds_s
-        return {"root": root}
+        df.tab.numerical = (numerical_data / scale - means_s) / stds_s
+        return {"df": df}
 
 
-class MinMaxScale(FitAwareStep):
+@Step.needs("df")
+class MinMaxScale(FittableStep):
     """Scale numerical columns to [0, 1] via min/max."""
 
     def __init__(
         self,
-        in_scope: str = "data",
-        out_scope: str = "data",
+        df_key: str = "data.base_df",
         name: Optional[str] = None,
     ) -> None:
         self._min: Optional[pd.Series] = None
         self._max: Optional[pd.Series] = None
 
-        super().__init__(
-            name=name or "min_max_scale",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "min_max_scale")
+        self.key_map = {
+            "df": df_key,
+        }
 
-    @Step.requires(root=pd.DataFrame)
-    def fit_impl(self, state: State, root: pd.DataFrame) -> None:
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def fit_impl(self, df: pd.DataFrame) -> None:
         """Fit min/max on train split."""
-        numerical_data = root.tab.train.tab.numerical
+        numerical_data = df.tab.train.tab.numerical
         if numerical_data.shape[1] == 0:
             self._min = pd.Series(dtype="float64")
             self._max = pd.Series(dtype="float64")
@@ -106,14 +106,12 @@ class MinMaxScale(FitAwareStep):
         self._min = numerical_data.min()
         self._max = numerical_data.max()
 
-    @Step.requires(root=pd.DataFrame)
-    @Step.provides(root=pd.DataFrame)
-    def run(self, state: State, root: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """Apply min-max scaling to numerical columns."""
 
-        numerical_data = root.tab.numerical
+        numerical_data = df.tab.numerical
         if numerical_data.shape[1] == 0:
-            return {"root": root}
+            return {"df": df}
 
         numerical_data = numerical_data.astype(np.float64, copy=False).replace(
             [np.inf, -np.inf], np.nan
@@ -124,5 +122,5 @@ class MinMaxScale(FitAwareStep):
         col_max = self._max.reindex(cols, fill_value=1.0)
         den = (col_max - col_min).clip(lower=1e-10, upper=None)
 
-        root.tab.numerical = (numerical_data - col_min) / den
-        return {"root": root}
+        df.tab.numerical = (numerical_data - col_min) / den
+        return {"df": df}

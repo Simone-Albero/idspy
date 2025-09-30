@@ -1,10 +1,8 @@
 from typing import Optional, Any, Dict
 
 import pandas as pd
-from torch.utils.data import Dataset
 
-from ...core.step import Step
-from ...core.state import State
+from ...core.step.base import Step
 from ...data.dataset import (
     CategoricalTensorDataset,
     NumericalTensorDataset,
@@ -12,45 +10,47 @@ from ...data.dataset import (
 )
 
 
+@Step.needs("df")
 class BuildDataset(Step):
     """Build dataset from dataframe in state."""
 
     def __init__(
         self,
-        in_scope: str = "data",
-        out_scope: str = "",
+        df_key: str = "data.base_df",
+        dataset_key: str = "dataset",
         name: Optional[str] = None,
     ) -> None:
 
-        super().__init__(
-            name=name or "build_dataset",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "build_dataset")
+        self.key_map = {
+            "root": df_key,
+            "dataset": dataset_key,
+        }
 
-    @Step.requires(root=pd.DataFrame)
-    @Step.provides(dataset=Dataset)
-    def run(self, state: State, root: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        numerical_cols = root.tab.schema.numerical
-        categorical_cols = root.tab.schema.categorical
-        target_col = root.tab.schema.target
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        numerical_cols = df.tab.schema.numerical
+        categorical_cols = df.tab.schema.categorical
+        target_col = df.tab.schema.target
 
         if numerical_cols and categorical_cols:
             dataset = MixedTabularDataset(
-                root,
+                df,
                 numerical_cols=numerical_cols,
                 categorical_cols=categorical_cols,
                 target_col=target_col if target_col else None,
             )
         elif numerical_cols:
             dataset = NumericalTensorDataset(
-                root,
+                df,
                 feature_cols=numerical_cols,
                 target_col=target_col if target_col else None,
             )
         elif categorical_cols:
             dataset = CategoricalTensorDataset(
-                root,
+                df,
                 feature_cols=categorical_cols,
                 target_col=target_col if target_col else None,
             )

@@ -2,10 +2,10 @@ from typing import Optional, Callable, Any, Dict
 
 from torch.utils.data import Dataset, DataLoader
 
-from ...core.step import Step
-from ...core.state import State
+from ...core.step.base import Step
 
 
+@Step.needs("dataset")
 class BuildDataLoader(Step):
     """Build dataloader from dataset in state."""
 
@@ -18,8 +18,8 @@ class BuildDataLoader(Step):
         persistent_workers: bool = False,
         drop_last: bool = False,
         collate_fn: Optional[Callable] = None,
-        in_scope: str = "",
-        out_scope: str = "",
+        dataset_key: str = "dataset",
+        dataloader_key: str = "dataloader",
         name: Optional[str] = None,
     ) -> None:
         self.batch_size = batch_size
@@ -30,15 +30,16 @@ class BuildDataLoader(Step):
         self.drop_last = drop_last
         self.collate_fn = collate_fn
 
-        super().__init__(
-            name=name or "build_dataloader",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "build_dataloader")
+        self.key_map = {
+            "dataset": dataset_key,
+            "dataloader": dataloader_key,
+        }
 
-    @Step.requires(dataset=Dataset)
-    @Step.provides(dataloader=DataLoader)
-    def run(self, state: State, dataset: Dataset) -> Optional[Dict[str, Any]]:
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def run(self, dataset: Dataset) -> Optional[Dict[str, Any]]:
         dataloader = DataLoader(
             dataset,
             batch_size=self.batch_size,

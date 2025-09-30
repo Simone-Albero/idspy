@@ -1,13 +1,12 @@
 from typing import Any, Dict, Optional
 
 import pandas as pd
-import numpy as np
 
-from ...core.step import Step
-from ...core.state import State
+from ...core.step.base import Step
 from ...data.partition import random_split, stratified_split
 
 
+@Step.needs("df", "seed")
 class RandomSplit(Step):
     """Random split into train/val/test."""
 
@@ -16,41 +15,43 @@ class RandomSplit(Step):
         train_size: float = 0.7,
         val_size: float = 0.15,
         test_size: float = 0.15,
-        in_scope: str = "data",
-        out_scope: str = "data",
+        df_key: str = "data.base_df",
+        seed_key: str = "seed",
+        split_mapping_key: str = "data.split_mapping",
         name: Optional[str] = None,
     ) -> None:
         self.train_size = train_size
         self.val_size = val_size
         self.test_size = test_size
 
-        super().__init__(
-            name=name or "random_split",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "random_split")
+        self.key_map = {
+            "df": df_key,
+            "seed": seed_key,
+            "split_mapping": split_mapping_key,
+        }
 
-    @Step.requires(root=pd.DataFrame, seed=int)
-    @Step.provides(root=pd.DataFrame, split_mapping=dict)
-    def run(
-        self, state: State, root: pd.DataFrame, seed: int
-    ) -> Optional[Dict[str, Any]]:
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
 
-        if root.empty:
-            return {"split_mapping": {}, "root": root}
+    def run(self, df: pd.DataFrame, seed: int) -> Optional[Dict[str, Any]]:
+
+        if df.empty:
+            return {"split_mapping": {}, "df_out": df}
 
         split_mapping = random_split(
-            root,
+            df,
             train_size=self.train_size,
             val_size=self.val_size,
             test_size=self.test_size,
             random_state=seed,
         )
 
-        root.tab.set_partitions_from_labels(split_mapping)
-        return {"split_mapping": split_mapping, "root": root}
+        df.tab.set_partitions_from_labels(split_mapping)
+        return {"split_mapping": split_mapping, "df": df}
 
 
+@Step.needs("df", "seed")
 class StratifiedSplit(Step):
     """Stratified split into train/val/test."""
 
@@ -60,8 +61,9 @@ class StratifiedSplit(Step):
         train_size: float = 0.7,
         val_size: float = 0.15,
         test_size: float = 0.15,
-        in_scope: str = "data",
-        out_scope: str = "data",
+        df_key: str = "data.base_df",
+        seed_key: str = "seed",
+        split_mapping_key: str = "data.split_mapping",
         name: Optional[str] = None,
     ) -> None:
         self.train_size = train_size
@@ -69,26 +71,26 @@ class StratifiedSplit(Step):
         self.test_size = test_size
         self.class_column = class_column
 
-        super().__init__(
-            name=name or "stratified_split",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "stratified_split")
+        self.key_map = {
+            "df": df_key,
+            "seed": seed_key,
+            "split_mapping": split_mapping_key,
+        }
 
-    @Step.requires(root=pd.DataFrame, seed=int)
-    @Step.provides(root=pd.DataFrame, split_mapping=dict)
-    def run(
-        self, state: State, root: pd.DataFrame, seed: int
-    ) -> Optional[Dict[str, Any]]:
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def run(self, df: pd.DataFrame, seed: int) -> Optional[Dict[str, Any]]:
 
         if not isinstance(self.class_column, str):
             raise ValueError("stratified_split: 'class_column' must be a string.")
 
-        if root.empty:
-            return {"split_mapping": {}, "root": root}
+        if df.empty:
+            return {"split_mapping": {}, "df_out": df}
 
         split_mapping = stratified_split(
-            root,
+            df,
             self.class_column,
             train_size=self.train_size,
             val_size=self.val_size,
@@ -96,43 +98,30 @@ class StratifiedSplit(Step):
             random_state=seed,
         )
 
-        root.tab.set_partitions_from_labels(split_mapping)
-        return {"split_mapping": split_mapping, "root": root}
+        df.tab.set_partitions_from_labels(split_mapping)
+        return {"split_mapping": split_mapping, "df": df}
 
 
+@Step.needs("df")
 class AssignSplitPartitions(Step):
     def __init__(
         self,
-        in_scope: str = "data",
-        out_scope: str = "data",
+        df_key: str = "data.base_df",
+        train_key: str = "data.train_df",
+        val_key: str = "data.val_df",
+        test_key: str = "data.test_df",
         name: Optional[str] = None,
     ) -> None:
-        super().__init__(
-            name=name or "assign_split_partitions",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "assign_split_partitions")
+        self.key_map = {
+            "df": df_key,
+            "train": train_key,
+            "val": val_key,
+            "test": test_key,
+        }
 
-    @Step.requires(root=pd.DataFrame)
-    @Step.provides(train=pd.DataFrame, val=pd.DataFrame, test=pd.DataFrame)
-    def run(self, state: State, root: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        return {"train": root.tab.train, "val": root.tab.val, "test": root.tab.test}
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
 
-
-class AssignSplitTarget(Step):
-    def __init__(
-        self,
-        in_scope: str = "data",
-        out_scope: str = "test",
-        name: Optional[str] = None,
-    ) -> None:
-        super().__init__(
-            name=name or "assign_split_target",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
-
-    @Step.requires(root=pd.DataFrame)
-    @Step.provides(targets=np.ndarray)
-    def run(self, state: State, root: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        return {"targets": root.tab.target.to_numpy()}
+    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        return {"train": df.tab.train, "val": df.tab.val, "test": df.tab.test}

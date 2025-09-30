@@ -1,11 +1,10 @@
 from pathlib import Path
-from sre_parse import State
 from typing import Optional, Any, Dict, Union
 
 import pandas as pd
 import torch
 
-from ...core.step import Step
+from ...core.step.base import Step
 from ...data.repository import DataFrameRepository
 from ...data.schema import Schema
 from ...nn.models.base import BaseModel
@@ -20,28 +19,26 @@ class LoadData(Step):
         file_path: Union[str, Path],
         fmt: Optional[str] = None,
         file_name: Optional[str] = None,
-        schema: Optional[Schema] = None,
         load_meta: bool = True,
-        in_scope: Optional[str] = "data",
-        out_scope: Optional[str] = "data",
+        schema: Optional[Schema] = None,
+        df_key: str = "data.base_df",
         name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         self.file_path = file_path
         self.fmt = fmt
         self.file_name = file_name
-        self.schema = schema
         self.load_meta = load_meta
+        self.schema = schema
         self.kwargs = kwargs
 
-        super().__init__(
-            name=name or "load_data",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "load_data")
+        self.key_map = {"df": df_key}
 
-    @Step.provides(root=pd.DataFrame)
-    def run(self, state: State) -> Optional[Dict[str, Any]]:
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def run(self) -> Optional[Dict[str, Any]]:
         dataframe: pd.DataFrame = DataFrameRepository.load(
             base_path=self.file_path,
             name=self.file_name,
@@ -50,9 +47,10 @@ class LoadData(Step):
             load_meta=self.load_meta,
             **self.kwargs,
         )
-        return {"root": dataframe}
+        return {"df": dataframe}
 
 
+@Step.needs("model", "device")
 class LoadModelWeights(Step):
     """Load model from state."""
 
@@ -61,29 +59,32 @@ class LoadModelWeights(Step):
         file_path: Union[str, Path],
         fmt: Optional[str] = None,
         file_name: Optional[str] = None,
-        map_location: Union[str, torch.device] = "cpu",
-        out_scope: str = "",
+        model_key: str = "model",
+        device_key: str = "device",
         name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         self.file_path = file_path
         self.fmt = fmt
         self.file_name = file_name
-        self.map_location = map_location
         self.kwargs = kwargs
 
-        super().__init__(
-            name=name or "load_model_weights",
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "load_model_weights")
+        self.key_map = {
+            "model": model_key,
+            "device": device_key,
+        }
 
-    @Step.requires(model=BaseModel)
-    def run(self, state: State, model: BaseModel) -> None:
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def run(self, model: BaseModel, device: torch.device) -> Optional[Dict[str, Any]]:
         load_weights(
             model,
             self.file_path,
             name=self.file_name,
             fmt=self.fmt,
-            map_location=self.map_location,
+            map_location=device,
             **self.kwargs,
         )
+        return {"model": model}

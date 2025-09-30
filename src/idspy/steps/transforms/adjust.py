@@ -3,76 +3,77 @@ from typing import Any, Dict, Optional
 import numpy as np
 import pandas as pd
 
-from ...core.step import Step
-from ...core.state import State
+from ...core.step.base import Step
 from ...data.tab_accessor import reattach_meta
 
 
+@Step.needs("df")
 class DropNulls(Step):
     """Drop all rows that contain null values, including NaN and ±inf."""
 
     def __init__(
         self,
-        in_scope: str = "data",
-        out_scope: str = "data",
+        df_key: str = "data.base_df",
         name: Optional[str] = None,
     ) -> None:
-        super().__init__(
-            name=name or "drop_nulls",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "drop_nulls")
 
-    @Step.requires(root=pd.DataFrame)
-    @Step.provides(root=pd.DataFrame)
-    def run(self, state: State, root: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        root = root.replace([np.inf, -np.inf], np.nan).dropna()
-        return {"root": root}
+        self.key_map = {
+            "df": df_key,
+        }
+
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        df = df.replace([np.inf, -np.inf], np.nan).dropna()
+        return {"df": df}
 
 
+@Step.needs("df")
 class Filter(Step):
     """Filter rows using a pandas query string."""
 
     def __init__(
         self,
         query: str,
-        in_scope: str = "data",
-        out_scope: str = "data",
+        df_key: str = "data.base_df",
         name: Optional[str] = None,
     ) -> None:
         self.query = query
 
-        super().__init__(
-            name=name or "filter",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "filter")
 
-    @Step.requires(root=pd.DataFrame)
-    @Step.provides(root=pd.DataFrame)
-    def run(self, state: State, root: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        filtered = root.query(self.query)
-        return {"root": reattach_meta(root, filtered)}
+        self.key_map = {
+            "df": df_key,
+        }
+
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        filtered = df.query(self.query)
+        return {"df": reattach_meta(df, filtered)}
 
 
+@Step.needs("df")
 class Log1p(Step):
     """Apply np.log1p to numerical columns."""
 
     def __init__(
         self,
-        in_scope: str = "data",
-        out_scope: str = "data",
+        df_key: str = "data.base_df",
         name: Optional[str] = None,
     ) -> None:
-        super().__init__(
-            name=name or "log1p",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "log1p")
 
-    @Step.requires(root=pd.DataFrame)
-    @Step.provides(root=pd.DataFrame)
-    def run(self, state: State, root: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        self.key_map = {
+            "df": df_key,
+        }
 
-        root.tab.numerical = np.log1p(root.tab.numerical)
-        return {"root": root}
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        df.tab.numerical = np.log1p(df.tab.numerical)
+        return {"df": df}
