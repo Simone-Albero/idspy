@@ -1,10 +1,13 @@
 from enum import Enum, auto
 from collections import defaultdict
+import logging
 from typing import Any, Sequence, Dict, List, Optional
 
 from ..storage.base import Storage
 from ..storage.proxy import BindedStorage
 from ..step.base import Step
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineEvent(Enum):
@@ -45,8 +48,8 @@ class Pipeline(Step):
         """Decorator: mark a method as a hook for `event` on subclasses."""
 
         def decorator(func):
-            setattr(func, "_hook_event", event)
-            setattr(func, "_hook_priority", priority)
+            func._hook_event = event
+            func._hook_priority = priority
             return func
 
         return decorator
@@ -57,27 +60,31 @@ class Pipeline(Step):
 
     def _collect_decorated_hooks(self) -> None:
         """
-        Find methods on this instance marked by @BasePipeline.hook and register them.
+        Find methods on this instance marked by @Pipeline.hook and register them.
         Works per-subclass without polluting base class/global state.
         """
         for name in dir(self):
             try:
-                attr = getattr(self, name)
-            except Exception:
+                method = getattr(self, name)
+                if callable(method) and hasattr(method, "_hook_event"):
+                    event = method._hook_event
+                    priority = getattr(method, "_hook_priority", 0)
+                    self._hooks[event].append((method, priority))
+            except (AttributeError, TypeError):
+                # Skip attributes that can't be accessed or aren't callable
                 continue
-            func = getattr(attr, "__func__", attr)
-            if callable(attr) and hasattr(func, "_hook_event"):
-                event = getattr(func, "_hook_event")
-                priority = getattr(func, "_hook_priority", 0)
-                # attr is bound method when coming via getattr(self, name)
-                self._hooks[event].append((attr, priority))
+
+        # Sort all hooks by priority
+        for event in self._hooks:
+            self._hooks[event].sort(key=lambda x: x[1])
 
     def _emit(self, event: PipelineEvent, **ctx: Any) -> None:
         """Invoke callbacks; hook failures are isolated and logged to stderr."""
-        for cb, _ in sorted(self._hooks.get(event, ()), key=lambda x: x[1]):
+        for cb, _ in self._hooks.get(event, []):
             try:
                 cb(**ctx)
             except Exception as e:
+                logger.error(f"Hook {getattr(cb, '__name__', str(cb))} failed: {e}")
                 raise e
 
     def run(self, **kwargs: Any) -> Dict[str, Any]:
@@ -86,26 +93,25 @@ class Pipeline(Step):
         Returns the final snapshot of *all* ports currently persisted for the pipeline's provided ports.
         """
         if kwargs:
-            self._storage.set(kwargs)
+            self.storage.set(kwargs)
 
         self._emit(PipelineEvent.PIPELINE_START)
-
         try:
             for idx, step in enumerate(self._steps):
-                storage = BindedStorage(self._storage, step.get_bindings() or {})
-
-                inputs = storage.get(step.requires)
+                binded_storage = BindedStorage(self._storage, step.bindings() or {})
+                inputs = binded_storage.get(step.requires)
                 self._emit(
                     PipelineEvent.STEP_START, step=step, index=idx, inputs=inputs
                 )
                 try:
-                    outputs = step.run(**inputs)
+                    outputs = step.run(**inputs) or {}
                 except Exception as e:
                     # hook first, then re-raise
                     self._emit(PipelineEvent.STEP_ERROR, step=step, index=idx, error=e)
                     raise
 
-                storage.set(outputs)
+                binded_storage.set(outputs)
+
                 self._emit(
                     PipelineEvent.STEP_END,
                     step=step,
@@ -113,12 +119,15 @@ class Pipeline(Step):
                     outputs=outputs,
                 )
 
-            result = self._storage.get(self.provided_ports)
+            result = self._storage.as_dict()
             self._emit(PipelineEvent.PIPELINE_END, result=result)
             return result
 
         finally:
             pass
+
+    def bindings(self) -> Dict[str, str]:
+        return {}
 
     def __call__(self, *args, **kwds) -> Dict[str, Any]:
         return self.run(*args, **kwds)

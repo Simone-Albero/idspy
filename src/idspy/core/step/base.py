@@ -9,7 +9,7 @@ class Step(ABC):
         self.name = name or self.__class__.__name__
 
     @classmethod
-    def requires(cls, *requirements: str):
+    def needs(cls, *requirements: str):
         def decorator(subcls):
             subcls._requires = tuple(requirements)
             return subcls
@@ -22,7 +22,7 @@ class Step(ABC):
 
     @property
     @abstractmethod
-    def get_bindings(self) -> Dict[str, str]:
+    def bindings(self) -> Dict[str, str]:
         """Return a mapping of port name to bound key, if any."""
         raise NotImplementedError
 

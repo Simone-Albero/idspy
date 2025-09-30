@@ -24,3 +24,6 @@ class DictStorage(Storage):
     def delete(self, name: str) -> None:
         if name in self._data:
             del self._data[name]
+
+    def as_dict(self) -> Dict[str, Any]:
+        return dict(self._data)

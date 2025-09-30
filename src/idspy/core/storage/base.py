@@ -34,6 +34,11 @@ class Storage(ABC):
         """Delete a stored value by key."""
         raise NotImplementedError
 
+    @abstractmethod
+    def as_dict(self) -> Dict[str, Any]:
+        """Return all stored values as a dictionary."""
+        raise NotImplementedError
+
 
 def has_key(key: str) -> StoragePredicate:
     """Accept states that contain `key`."""

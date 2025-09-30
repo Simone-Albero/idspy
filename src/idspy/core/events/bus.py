@@ -77,8 +77,10 @@ class EventBus:
     ) -> None:
         """Dispatch event to subscribers; log handler errors."""
         targets: List[_Entry] = []
-        targets.extend(self._subs.get(event_type, ()))
-        targets.extend(self._subs.get(self.ALL, ()))
+        targets.extend(self._subs.get(event_type, []))
+
+        if event_type != self.ALL:
+            targets.extend(self._subs.get(self.ALL, []))
 
         targets.sort(key=lambda entry: entry.priority)
         event = Event(type=event_type or "unknown", source=source, payload=payload)
