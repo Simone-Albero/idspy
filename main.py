@@ -5,45 +5,45 @@ import torch
 from src.idspy.common.logging import setup_logging
 from src.idspy.common.utils import set_seeds
 
-from src.idspy.core.state import State
-from src.idspy.core.step import Step
-from src.idspy.core.pipeline import (
-    FitAwareObservablePipeline,
+from src.idspy.core.storage.dict import DictStorage
+from src.idspy.core.pipeline.fittable import FittablePipeline
+from src.idspy.core.pipeline.base import PipelineEvent
+from src.idspy.core.pipeline.observable import (
     ObservablePipeline,
-    PipelineEvent,
-    RepeatableObservablePipeline,
+    ObservableFittablePipeline,
 )
+from src.idspy.core.pipeline.repeatable import RepeatablePipeline
+from src.idspy.core.events.bus import EventBus
 
 from src.idspy.data.schema import Schema, ColumnRole
 from src.idspy.data.tab_accessor import TabAccessor
+from src.idspy.data.torch.batch import default_collate
 
-from src.idspy.events.bus import EventBus
-from src.idspy.events.events import only_id
-from src.idspy.events.handlers.logging import Logger, DataFrameProfiler
+from src.idspy.nn.torch.helper import get_device
+from src.idspy.nn.torch.model.classifier import TabularClassifier
+from src.idspy.nn.torch.loss.classification import ClassificationLoss
 
-from src.idspy.steps.io.saver import SaveData, SaveModelWeights
-from src.idspy.steps.io.loader import LoadData, LoadModelWeights
-from src.idspy.steps.builders.dataloader import BuildDataLoader
-from src.idspy.steps.builders.dataset import BuildDataset
-from src.idspy.steps.transforms.adjust import DropNulls
-from src.idspy.steps.transforms.map import FrequencyMap, LabelMap
-from src.idspy.steps.transforms.scale import StandardScale
-from src.idspy.steps.transforms.split import (
-    AssignSplitPartitions,
+from src.idspy.builtins.handler.logging import Logger
+
+from src.idspy.builtins.step.data.io import SaveData, LoadData
+from src.idspy.builtins.step.data.adjust import DropNulls
+from src.idspy.builtins.step.data.map import FrequencyMap, LabelMap
+from src.idspy.builtins.step.data.scale import StandardScale
+from src.idspy.builtins.step.data.split import (
+    AllocateSplitPartitions,
+    AllocateTargets,
     StratifiedSplit,
-    AssignSplitTarget,
 )
 
-from src.idspy.steps.model.training import TrainOneEpoch
-from src.idspy.steps.model.evaluating import ValidateOneEpoch, MakePredictions
-from src.idspy.steps.model.early_stopping import EarlyStopping
-from src.idspy.steps.metrics.classification import ClassificationMetrics
-
-
-from src.idspy.nn.batch import default_collate
-from src.idspy.nn.helpers import get_device
-from src.idspy.nn.models.classifier import TabularClassifier
-from src.idspy.nn.losses.classification import ClassificationLoss
+from src.idspy.builtins.step.torch.builder.dataloader import BuildDataLoader
+from src.idspy.builtins.step.torch.builder.dataset import BuildDataset
+from src.idspy.builtins.step.torch.engine.train import TrainOneEpoch
+from src.idspy.builtins.step.torch.engine.validate import (
+    ValidateOneEpoch,
+    MakePredictions,
+)
+from src.idspy.builtins.step.torch.model.io import LoadModelWeights, SaveModelWeights
+from src.idspy.builtins.step.torch.metric.classification import ClassificationMetrics
 
 
 setup_logging()
@@ -105,23 +105,39 @@ def main():
         ColumnRole.CATEGORICAL,
     )
 
-    bus = EventBus()
-    bus.subscribe(callback=Logger(), event_type=PipelineEvent.BEFORE_STEP)
-    # bus.subscribe(callback=Tracer())
-    # bus.subscribe(
-    #     callback=DataFrameProfiler(),
-    #     event_type=PipelineEvent.AFTER_STEP,
-    #     predicate=only_id("training_pipeline.load_data"),
-    # )
+    device = get_device()
+    model = TabularClassifier(
+        num_features=len(schema.numerical),
+        cat_cardinalities=[20] * len(schema.categorical),
+        num_classes=15,
+        hidden_dims=[128, 64],
+        dropout=0.1,
+    ).to(device)
+    loss = ClassificationLoss().to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    storage = DictStorage(
+        {
+            "device": device,
+            "model": model,
+            "loss_fn": loss,
+            "optimizer": optimizer,
+            "seed": 42,
+            "stop_pipeline": False,
+        }
+    )
 
-    fit_aware_pipeline = FitAwareObservablePipeline(
+    bus = EventBus()
+    bus.subscribe(callback=Logger(), event_type=str(PipelineEvent.STEP_START))
+
+    fit_aware_pipeline = ObservableFittablePipeline(
         steps=[
             StandardScale(),
             FrequencyMap(max_levels=20),
             LabelMap(),
         ],
-        bus=bus,
         name="fit_aware_pipeline",
+        bus=bus,
+        storage=storage,
     )
 
     preprocessing_pipeline = ObservablePipeline(
@@ -140,68 +156,61 @@ def main():
                 fmt="parquet",
             ),
         ],
+        storage=storage,
         bus=bus,
         name="preprocessing_pipeline",
     )
 
-    training_pipeline = RepeatableObservablePipeline(
-        count=100,
+    training_pipeline = ObservablePipeline(
         steps=[
             LoadData(file_path="resources/data/processed/cic_2018_v2.parquet"),
-            AssignSplitPartitions(),
-            AssignSplitTarget(in_scope="data", out_scope="test"),
-            BuildDataset(out_scope="train"),
+            AllocateSplitPartitions(),
+            AllocateTargets(df_key="test.data", targets_key="test.targets"),
+            BuildDataset(df_key="train.data", dataset_key="train.dataset"),
             BuildDataLoader(
-                in_scope="train",
-                out_scope="train",
+                dataset_key="train.dataset",
+                dataloader_key="train.dataloader",
                 batch_size=512,
                 num_workers=6,
                 shuffle=True,
                 collate_fn=default_collate,
             ),
-            BuildDataset(out_scope="val"),
+            BuildDataset(df_key="test.data", dataset_key="test.dataset"),
             BuildDataLoader(
-                in_scope="val",
-                out_scope="val",
+                dataset_key="test.dataset",
+                dataloader_key="test.dataloader",
                 batch_size=1024,
+                num_workers=6,
                 shuffle=False,
                 collate_fn=default_collate,
             ),
             TrainOneEpoch(),
-            # SaveModelWeights(file_path="resources/models/cic_2018_v2/model.pt"),
-            ValidateOneEpoch(in_scope="val", out_scope="val", save_outputs=True),
-            EarlyStopping(),
-            # MakePredictions(pred_fn=lambda x: torch.argmax(x, dim=1)),
-            # ClassificationMetrics(),
+            SaveModelWeights(file_path="resources/models/cic_2018_v2/model.pt"),
+            ValidateOneEpoch(
+                dataloader_key="test.dataloader",
+                metrics_key="test.metrics",
+                outputs_key="test.outputs",
+                save_outputs=True,
+            ),
+            MakePredictions(
+                pred_fn=lambda x: torch.argmax(x, dim=1),
+                outputs_key="test.outputs",
+                predictions_key="test.predictions",
+            ),
+            ClassificationMetrics(
+                predictions_key="test.predictions",
+                targets_key="test.targets",
+                metrics_key="test.metrics",
+            ),
         ],
         bus=bus,
         name="training_pipeline",
+        storage=storage,
     )
 
-    device = get_device()
-    model = TabularClassifier(
-        num_features=len(schema.numerical),
-        cat_cardinalities=[20] * len(schema.categorical),
-        num_classes=15,
-        hidden_dims=[128, 64],
-        dropout=0.1,
-    ).to(device)
-    loss = ClassificationLoss().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    state = State(
-        {
-            "device": device,
-            "model": model,
-            "loss": loss,
-            "optimizer": optimizer,
-            "seed": 42,
-            "stop_pipeline": False,
-        }
-    )
-
-    # preprocessing_pipeline.run(state)
-    training_pipeline.run(state)
-    print(state.get("test.metrics", dict))
+    # preprocessing_pipeline.run()
+    training_pipeline.run()
+    print(storage.get(["test.metrics"]))
 
 
 if __name__ == "__main__":

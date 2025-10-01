@@ -1,13 +1,13 @@
 from typing import Any, Dict, Optional
 import logging
 
-from ...core.step import Step
-from ...core.state import State
-from ...nn.models.base import BaseModel
+from .....core.step.base import Step
+from .....nn.torch.model.base import BaseModel
 
 logger = logging.getLogger(__name__)
 
 
+@Step.needs(avg_loss=float, model=BaseModel)
 class EarlyStopping(Step):
     """Early stopping step to monitor a metric and stop training if no improvement is seen."""
 
@@ -16,17 +16,19 @@ class EarlyStopping(Step):
         patience: int = 5,
         mode: str = "min",
         min_delta: float = 0.0,
-        in_scope: str = "val",
-        out_scope: str = "",
+        model_key: str = "model",
+        avg_loss_key: str = "val.avg_loss",
+        stop_key: str = "stop_pipeline",
         name: Optional[str] = None,
     ) -> None:
-        super().__init__(name=name, in_scope=in_scope, out_scope=out_scope)
+        super().__init__(name=name or "early_stopping")
         self.patience = patience
         self.mode = mode
         self.min_delta = min_delta
         self.best_score: Optional[float] = None
         self.best_model: Optional[BaseModel] = None
         self.num_bad_epochs = 0
+
         if mode not in {"min", "max"}:
             raise ValueError("mode must be 'min' or 'max'")
         if mode == "min":
@@ -36,20 +38,20 @@ class EarlyStopping(Step):
             self.monitor_op = lambda current, best: current > best + min_delta
             self.best_score = -float("inf")
 
-    @Step.requires(history=list, model=BaseModel)
-    @Step.provides(stop_pipeline=bool, model=BaseModel)
-    def run(
-        self, state: State, history: list, model: BaseModel
-    ) -> Optional[Dict[str, Any]]:
-        current_score = history[-1]
+        self.key_map = {
+            "history": avg_loss_key,
+            "model": model_key,
+            "stop_training": stop_key,
+        }
 
+    def run(self, avg_loss: float, model: BaseModel) -> Optional[Dict[str, Any]]:
         if self.best_score is None:
-            self.best_score = current_score
+            self.best_score = avg_loss
             self.num_bad_epochs = 0
             self.best_model = model
-        elif self.monitor_op(current_score, self.best_score):
-            logger.info(f"EARLY_STOPPING {self.best_score:.6f} -> {current_score:.6f}.")
-            self.best_score = current_score
+        elif self.monitor_op(avg_loss, self.best_score):
+            logger.info(f"EARLY_STOPPING {self.best_score:.6f} -> {avg_loss:.6f}.")
+            self.best_score = avg_loss
             self.num_bad_epochs = 0
             self.best_model = model
         else:
@@ -58,6 +60,6 @@ class EarlyStopping(Step):
 
         if self.num_bad_epochs >= self.patience:
             logger.info("EARLY_STOPPING Triggered")
-            return {"stop_pipeline": True, "model": self.best_model}
+            return {"stop_training": True, "model": self.best_model}
         else:
-            return {"stop_pipeline": False, "model": model}
+            return {"stop_training": False}

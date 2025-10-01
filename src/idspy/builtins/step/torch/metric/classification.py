@@ -1,33 +1,31 @@
 from typing import Optional, Dict, Any
 
 import numpy as np
-from torch.utils.tensorboard import SummaryWriter
 
-from ...core.step import Step
-from ...core.state import State
+from .....core.step.base import Step
 
 
+@Step.needs("predictions", "targets")
 class ClassificationMetrics(Step):
     """Compute metrics for multiclass classification."""
 
     def __init__(
         self,
-        log_dir: Optional[str] = None,
-        log_prefix: str = "test",
-        in_scope: str = "test",
-        out_scope: str = "test",
         name: Optional[str] = None,
+        predictions_key: str = "predictions",
+        targets_key: str = "targets",
+        metrics_key: str = "classification_metrics",
     ) -> None:
-        self.writer: Optional[SummaryWriter] = (
-            SummaryWriter(log_dir) if log_dir else None
-        )
-        self.log_prefix = log_prefix
 
-        super().__init__(
-            name=name or "multiclass_classification_metrics",
-            in_scope=in_scope,
-            out_scope=out_scope,
-        )
+        super().__init__(name=name or "classification_metrics")
+        self.key_map = {
+            "predictions": predictions_key,
+            "targets": targets_key,
+            "metrics": metrics_key,
+        }
+
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
 
     def compute_metrics(self, y_pred: np.ndarray, y_true: np.ndarray) -> Dict[str, Any]:
         """Compute classification metrics."""
@@ -61,19 +59,6 @@ class ClassificationMetrics(Step):
 
         return metrics
 
-    @Step.requires(
-        predictions=np.ndarray,
-        targets=np.ndarray,
-    )
-    @Step.provides(metrics=dict)
-    def run(self, state: State, predictions: np.ndarray, targets: np.ndarray) -> None:
+    def run(self, predictions: np.ndarray, targets: np.ndarray) -> None:
         metrics = self.compute_metrics(predictions, targets)
-
-        for name, value in metrics.items():
-            if isinstance(value, (int, float)) and self.writer is not None:
-                self.writer.add_scalar(f"{self.log_prefix}/{name}", value)
-
-        if self.writer is not None:
-            self.writer.close()
-
         return {"metrics": metrics}

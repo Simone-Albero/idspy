@@ -8,8 +8,8 @@ from torch.profiler import (
     tensorboard_trace_handler,
 )
 
-from ...core.step import ContextualStep, Step
-from ...core.state import State
+from .....core.step.base import Step
+from .....core.step.contextual import ContextualStep
 
 
 class TorchProfiler(ContextualStep):
@@ -27,11 +27,9 @@ class TorchProfiler(ContextualStep):
         profile_memory: bool = True,
         with_stack: bool = False,
         with_flops: bool = False,
-        in_scope: Optional[str] = None,
-        out_scope: Optional[str] = None,
         name: Optional[str] = None,
     ) -> None:
-        super().__init__(step=step, in_scope=in_scope, out_scope=out_scope, name=name)
+        super().__init__(step=step, name=name)
 
         # store config
         self.log_dir = log_dir
@@ -44,8 +42,7 @@ class TorchProfiler(ContextualStep):
         self.with_stack = with_stack
         self.with_flops = with_flops
 
-    def context(self, state: State) -> Optional[any]:
-        # Decide activities
+    def context(self) -> Optional[any]:
         acts = [ProfilerActivity.CPU]
         if torch.cuda.is_available():
             acts.append(ProfilerActivity.CUDA)
