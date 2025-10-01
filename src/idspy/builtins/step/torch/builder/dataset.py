@@ -2,8 +2,8 @@ from typing import Optional, Any, Dict
 
 import pandas as pd
 
-from ...core.step.base import Step
-from ...data.dataset import (
+from .....core.step.base import Step
+from .....data.torch.dataset import (
     CategoricalTensorDataset,
     NumericalTensorDataset,
     MixedTabularDataset,
@@ -16,14 +16,14 @@ class BuildDataset(Step):
 
     def __init__(
         self,
-        df_key: str = "data.base_df",
+        df_key: str = "data",
         dataset_key: str = "dataset",
         name: Optional[str] = None,
     ) -> None:
 
         super().__init__(name=name or "build_dataset")
         self.key_map = {
-            "root": df_key,
+            "df": df_key,
             "dataset": dataset_key,
         }
 
