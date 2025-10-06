@@ -30,7 +30,7 @@ class ConditionalStep(Step, ABC):
         if not self.should_run(**kwargs):
             self.on_skip(**kwargs)
             return {}
-        return super().run(**kwargs)
+        return self.compute(**kwargs)
 
     def __repr__(self) -> str:
         base = super().__repr__().rstrip(")")

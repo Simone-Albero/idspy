@@ -42,7 +42,7 @@ class ValidateOneEpoch(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(
+    def compute(
         self,
         dataloader: torch.utils.data.DataLoader,
         model: BaseModel,
@@ -93,7 +93,7 @@ class ForwardOnce(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(
+    def compute(
         self, inputs: torch.Tensor, model: BaseModel, device: torch.device
     ) -> Optional[Dict[str, Any]]:
         out: ModelOutput = forward_pass(model, inputs, device)
@@ -126,7 +126,7 @@ class MakePredictions(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, outputs: List[ModelOutput]) -> Optional[Dict[str, Any]]:
+    def compute(self, outputs: List[ModelOutput]) -> Optional[Dict[str, Any]]:
         predictions = []
         for output in outputs:
             prediction = (

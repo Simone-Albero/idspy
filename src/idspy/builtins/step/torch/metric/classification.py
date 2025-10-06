@@ -59,6 +59,6 @@ class ClassificationMetrics(Step):
 
         return metrics
 
-    def run(self, predictions: np.ndarray, targets: np.ndarray) -> None:
+    def compute(self, predictions: np.ndarray, targets: np.ndarray) -> None:
         metrics = self.compute_metrics(predictions, targets)
         return {"metrics": metrics}

@@ -34,7 +34,9 @@ class LoadModelWeights(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, model: BaseModel, device: torch.device) -> Optional[Dict[str, Any]]:
+    def compute(
+        self, model: BaseModel, device: torch.device
+    ) -> Optional[Dict[str, Any]]:
         ModulesRepository.load_weights(
             model,
             self.file_path,
@@ -67,7 +69,7 @@ class SaveModelWeights(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, model: BaseModel) -> Optional[Dict[str, Any]]:
+    def compute(self, model: BaseModel) -> Optional[Dict[str, Any]]:
         ModulesRepository.save_weights(
             model, self.file_path, name=self.file_name, fmt=self.fmt
         )

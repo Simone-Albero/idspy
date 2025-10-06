@@ -34,7 +34,7 @@ class RandomSplit(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, df: pd.DataFrame, seed: int) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame, seed: int) -> Optional[Dict[str, Any]]:
 
         if df.empty:
             return {"split_mapping": {}, "df_out": df}
@@ -81,7 +81,7 @@ class StratifiedSplit(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, df: pd.DataFrame, seed: int) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame, seed: int) -> Optional[Dict[str, Any]]:
 
         if not isinstance(self.class_column, str):
             raise ValueError("stratified_split: 'class_column' must be a string.")
@@ -123,7 +123,7 @@ class AllocateSplitPartitions(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         return {"train": df.tab.train, "val": df.tab.val, "test": df.tab.test}
 
 
@@ -144,5 +144,5 @@ class AllocateTargets(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         return {"targets": df.tab.target.to_numpy()}

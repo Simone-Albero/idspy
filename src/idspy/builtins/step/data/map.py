@@ -52,7 +52,7 @@ class FrequencyMap(FittableStep):
 
             self.cat_types[col] = CategoricalDtype(categories=cats, ordered=True)
 
-    def run(self, df: pd.DataFrame) -> None:
+    def compute(self, df: pd.DataFrame) -> None:
         """Apply learned frequency mapping to categorical columns."""
 
         # Early exit if no categorical mappings learned
@@ -110,7 +110,7 @@ class LabelMap(FittableStep):
         vc = train_df[tgt_col].value_counts(dropna=False)
         self.cat_types = CategoricalDtype(categories=vc.index.tolist(), ordered=True)
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         tgt_col = df.tab.schema.target
 
         prev = df[tgt_col].copy()

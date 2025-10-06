@@ -24,7 +24,7 @@ class TensorBoardLogger(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, metrics: Dict[str, float]) -> Optional[Dict[str, Any]]:
+    def compute(self, metrics: Dict[str, float]) -> Optional[Dict[str, Any]]:
         for key, value in metrics.items():
             self.writer.add_scalar(key, value, self.step)
         self.writer.flush()

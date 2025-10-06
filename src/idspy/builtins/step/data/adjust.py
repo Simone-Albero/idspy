@@ -25,7 +25,7 @@ class DropNulls(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         df = df.replace([np.inf, -np.inf], np.nan).dropna()
         return {"df": df}
 
@@ -51,7 +51,7 @@ class Filter(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         filtered = df.query(self.query)
         return {"df": reattach_meta(df, filtered)}
 
@@ -74,6 +74,6 @@ class Log1p(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         df.tab.numerical = np.log1p(df.tab.numerical)
         return {"df": df}

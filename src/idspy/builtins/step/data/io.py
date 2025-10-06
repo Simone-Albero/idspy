@@ -34,7 +34,7 @@ class SaveData(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         DataFrameRepository.save(
             df,
             self.file_path,
@@ -72,7 +72,7 @@ class LoadData(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self) -> Optional[Dict[str, Any]]:
+    def compute(self) -> Optional[Dict[str, Any]]:
         dataframe: pd.DataFrame = DataFrameRepository.load(
             base_path=self.file_path,
             name=self.file_name,

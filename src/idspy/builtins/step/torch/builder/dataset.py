@@ -30,7 +30,7 @@ class BuildDataset(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         numerical_cols = df.tab.schema.numerical
         categorical_cols = df.tab.schema.categorical
         target_col = df.tab.schema.target

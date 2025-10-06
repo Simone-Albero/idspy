@@ -26,7 +26,7 @@ class DownsampleToMinority(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
 
         # Early exits for edge cases
         if df.empty or self.class_column not in df.columns:
@@ -73,7 +73,7 @@ class Downsample(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
 
         if df.empty:
             return {"df": df}

@@ -7,8 +7,8 @@ from .base import Step
 class ContextualStep(Step):
     """A Step that runs within a context manager."""
 
-    def __init__(self, step: Step, name: Optional[str] = None):
-        super().__init__(name=name)
+    def __init__(self, name: Optional[str] = None, step: Optional[Step] = None) -> None:
+        self.name = name or self.__class__.__name__
         self.step = step
 
     @abstractmethod
@@ -23,7 +23,11 @@ class ContextualStep(Step):
         does not provide the value.
         """
         with self.context(**kwargs) as ctx:
-            return self.step.run(context=ctx, **kwargs)
+            return (
+                self.step.compute(context=ctx, **kwargs)
+                if self.step is not None
+                else self.compute(context=ctx, **kwargs)
+            )
 
     def __repr__(self):
         base = super().__repr__().rstrip(")")

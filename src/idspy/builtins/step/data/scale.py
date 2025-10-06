@@ -52,7 +52,7 @@ class StandardScale(FittableStep):
         self._means_s = num_scaled.mean()
         self._stds_s = num_scaled.std(ddof=0).clip(lower=1e-10, upper=None)
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """Apply standardization to numerical columns."""
 
         numerical_data = df.tab.numerical
@@ -106,7 +106,7 @@ class MinMaxScale(FittableStep):
         self._min = numerical_data.min()
         self._max = numerical_data.max()
 
-    def run(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """Apply min-max scaling to numerical columns."""
 
         numerical_data = df.tab.numerical

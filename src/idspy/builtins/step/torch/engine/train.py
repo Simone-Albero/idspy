@@ -38,7 +38,7 @@ class TrainOneEpoch(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(
+    def compute(
         self,
         dataloader: torch.utils.data.DataLoader,
         model: BaseModel,

@@ -39,7 +39,7 @@ class BuildDataLoader(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def run(self, dataset: Dataset) -> Optional[Dict[str, Any]]:
+    def compute(self, dataset: Dataset) -> Optional[Dict[str, Any]]:
         dataloader = DataLoader(
             dataset,
             batch_size=self.batch_size,

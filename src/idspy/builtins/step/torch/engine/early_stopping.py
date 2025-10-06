@@ -44,7 +44,7 @@ class EarlyStopping(Step):
             "stop_training": stop_key,
         }
 
-    def run(self, avg_loss: float, model: BaseModel) -> Optional[Dict[str, Any]]:
+    def compute(self, avg_loss: float, model: BaseModel) -> Optional[Dict[str, Any]]:
         if self.best_score is None:
             self.best_score = avg_loss
             self.num_bad_epochs = 0

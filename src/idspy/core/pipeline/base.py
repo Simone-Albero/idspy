@@ -87,7 +87,7 @@ class Pipeline(Step):
                 logger.error(f"Hook {getattr(cb, '__name__', str(cb))} failed: {e}")
                 raise e
 
-    def run(self, **kwargs: Any) -> Dict[str, Any]:
+    def compute(self, **kwargs: Any) -> Dict[str, Any]:
         """
         Execute all steps sequentially using storage for I/O.
         Returns the final snapshot of *all* ports currently persisted for the pipeline's provided ports.
