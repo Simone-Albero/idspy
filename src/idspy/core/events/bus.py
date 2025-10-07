@@ -38,6 +38,13 @@ class EventBus:
         """Register callback; returns a token."""
         token = self._next_token
         self._next_token += 1
+
+        if not isinstance(event_type, (str, type(None))):
+            try:
+                event_type = str(event_type)
+            except Exception as e:
+                raise ValueError("event_type must be a string or None") from e
+
         self._subs.setdefault(event_type, []).append(
             _Entry(callback, predicate, token, priority)
         )

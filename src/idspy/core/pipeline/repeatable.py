@@ -24,11 +24,12 @@ class RepeatablePipeline(Pipeline):
 
     def run(self, **kwargs: Any) -> Dict[str, Any]:
         """Run the pipeline multiple times."""
-        # Clear storage to ensure isolated state for each run
-        if self.clear_storage:
-            self._storage.clear()
-
         for _ in range(self.count):
             if self.predicate is not None and self.predicate(self._storage):
                 break
+
+            # Clear storage to ensure isolated state for each run
+            if self.clear_storage:
+                self._storage.clear()
+
             super().run(**kwargs)
