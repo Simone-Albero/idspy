@@ -6,13 +6,12 @@ from src.idspy.common.logging import setup_logging
 from src.idspy.common.utils import set_seeds
 
 from src.idspy.core.storage.dict import DictStorage
-from src.idspy.core.pipeline.fittable import FittablePipeline
 from src.idspy.core.pipeline.base import PipelineEvent
 from src.idspy.core.pipeline.observable import (
     ObservablePipeline,
     ObservableFittablePipeline,
+    ObservableRepeatablePipeline,
 )
-from src.idspy.core.pipeline.repeatable import RepeatablePipeline
 from src.idspy.core.events.bus import EventBus
 
 from src.idspy.data.schema import Schema, ColumnRole
@@ -35,15 +34,17 @@ from src.idspy.builtins.step.data.split import (
     StratifiedSplit,
 )
 
-from src.idspy.builtins.step.torch.builder.dataloader import BuildDataLoader
-from src.idspy.builtins.step.torch.builder.dataset import BuildDataset
-from src.idspy.builtins.step.torch.engine.train import TrainOneEpoch
-from src.idspy.builtins.step.torch.engine.validate import (
+from src.idspy.builtins.step.nn.torch.builder.dataloader import BuildDataLoader
+from src.idspy.builtins.step.nn.torch.builder.dataset import BuildDataset
+from src.idspy.builtins.step.nn.torch.engine.train import TrainOneEpoch
+from src.idspy.builtins.step.nn.torch.engine.validate import (
     ValidateOneEpoch,
     MakePredictions,
 )
-from src.idspy.builtins.step.torch.model.io import LoadModelWeights, SaveModelWeights
-from src.idspy.builtins.step.torch.metric.classification import ClassificationMetrics
+from src.idspy.builtins.step.nn.torch.engine.early_stopping import EarlyStopping
+from src.idspy.builtins.step.nn.torch.model.io import LoadModelWeights, SaveModelWeights
+from src.idspy.builtins.step.nn.torch.metric.classification import ClassificationMetrics
+from src.idspy.builtins.step.nn.torch.log.tensorboard import TensorBoardLogger
 
 
 setup_logging()
@@ -127,7 +128,7 @@ def main():
     )
 
     bus = EventBus()
-    bus.subscribe(callback=Logger(), event_type=str(PipelineEvent.STEP_START))
+    bus.subscribe(callback=Logger(), event_type=PipelineEvent.STEP_START)
 
     fit_aware_pipeline = ObservableFittablePipeline(
         steps=[
@@ -161,7 +162,7 @@ def main():
         name="preprocessing_pipeline",
     )
 
-    training_pipeline = ObservablePipeline(
+    training_pipeline = ObservableRepeatablePipeline(
         steps=[
             LoadData(file_path="resources/data/processed/cic_2018_v2.parquet"),
             AllocateSplitPartitions(),
@@ -185,12 +186,19 @@ def main():
                 collate_fn=default_collate,
             ),
             TrainOneEpoch(),
+            TensorBoardLogger(log_dir="resources/logs", metrics_key="train.metrics"),
             SaveModelWeights(file_path="resources/models/cic_2018_v2/model.pt"),
             ValidateOneEpoch(
                 dataloader_key="test.dataloader",
                 metrics_key="test.metrics",
                 outputs_key="test.outputs",
                 save_outputs=True,
+            ),
+            EarlyStopping(
+                min_delta=0.001,
+                metrics_key="test.metrics",
+                model_key="model",
+                stop_key="stop_pipeline",
             ),
             MakePredictions(
                 pred_fn=lambda x: torch.argmax(x, dim=1),
@@ -202,8 +210,12 @@ def main():
                 targets_key="test.targets",
                 metrics_key="test.metrics",
             ),
+            TensorBoardLogger(log_dir="resources/logs", metrics_key="test.metrics"),
         ],
         bus=bus,
+        count=100,
+        clear_storage=False,
+        predicate=lambda storage: storage.get("stop_pipeline"),
         name="training_pipeline",
         storage=storage,
     )

@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any
 
 import numpy as np
 
-from .....core.step.base import Step
+from ......core.step.base import Step
 
 
 @Step.needs("predictions", "targets")

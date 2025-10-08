@@ -2,7 +2,7 @@ from typing import Optional, Callable, Any, Dict
 
 from torch.utils.data import Dataset, DataLoader
 
-from .....core.step.base import Step
+from ......core.step.base import Step
 
 
 @Step.needs("dataset")

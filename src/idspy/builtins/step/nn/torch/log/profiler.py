@@ -8,8 +8,8 @@ from torch.profiler import (
     tensorboard_trace_handler,
 )
 
-from .....core.step.base import Step
-from .....core.step.contextual import ContextualStep
+from ......core.step.base import Step
+from ......core.step.contextual import ContextualStep
 
 
 class TorchProfiler(ContextualStep):

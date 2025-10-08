@@ -2,8 +2,8 @@ from typing import Optional, Any, Dict
 
 import pandas as pd
 
-from .....core.step.base import Step
-from .....data.torch.dataset import (
+from ......core.step.base import Step
+from ......data.torch.dataset import (
     CategoricalTensorDataset,
     NumericalTensorDataset,
     MixedTabularDataset,

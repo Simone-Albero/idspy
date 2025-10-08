@@ -2,10 +2,10 @@ from typing import Dict, Optional, Any
 
 import torch
 
-from .....common.utils import PathLike
-from .....core.step.base import Step
-from .....nn.torch.model.base import BaseModel
-from .....nn.torch.module.repository import ModulesRepository
+from ......common.utils import PathLike
+from ......core.step.base import Step
+from ......nn.torch.model.base import BaseModel
+from ......nn.torch.module.repository import ModulesRepository
 
 
 @Step.needs("model", "device")

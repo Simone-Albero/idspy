@@ -1,8 +1,8 @@
 from typing import Any, Dict, Optional
 import logging
 
-from .....core.step.base import Step
-from .....nn.torch.model.base import BaseModel
+from ......core.step.base import Step
+from ......nn.torch.model.base import BaseModel
 
 logger = logging.getLogger(__name__)
 

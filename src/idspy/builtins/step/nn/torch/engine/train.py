@@ -2,10 +2,10 @@ from typing import Any, Dict, Optional
 
 import torch
 
-from .....core.step.base import Step
-from .....nn.torch.model.base import BaseModel
-from .....nn.torch.loss.base import BaseLoss
-from .....nn.torch.engine.loops import train_epoch
+from ......core.step.base import Step
+from ......nn.torch.model.base import BaseModel
+from ......nn.torch.loss.base import BaseLoss
+from ......nn.torch.engine.loops import train_epoch
 
 
 @Step.needs("dataloader", "model", "loss_fn", "optimizer", "device")

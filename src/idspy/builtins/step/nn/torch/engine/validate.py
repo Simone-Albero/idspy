@@ -5,11 +5,11 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from .....core.step.base import Step
-from .....nn.torch.model.base import BaseModel, ModelOutput
-from .....nn.torch.loss.base import BaseLoss
-from .....nn.torch.engine.loops import eval_epoch
-from .....nn.torch.engine.forward import forward_pass, make_predictions
+from ......core.step.base import Step
+from ......nn.torch.model.base import BaseModel, ModelOutput
+from ......nn.torch.loss.base import BaseLoss
+from ......nn.torch.engine.loops import eval_epoch
+from ......nn.torch.engine.forward import forward_pass, make_predictions
 
 
 @Step.needs("dataloader", "model", "loss_fn", "device")
