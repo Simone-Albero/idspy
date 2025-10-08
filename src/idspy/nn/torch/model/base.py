@@ -2,7 +2,7 @@ from typing import Any, Dict, Mapping, NamedTuple, Optional, Tuple
 
 from torch import nn, Tensor
 import torch
-from ....data.torch.batch import Batch
+from ....data.torch.batch import Batch, ensure_batch
 
 
 class ModelOutput(NamedTuple):
@@ -64,4 +64,5 @@ class BaseModel(nn.Module):
         Prepares arguments for the loss function. Default: pred=output['logits'], target=batch.target.
         Override if your model/loss requires different fields.
         """
-        raise NotImplementedError
+        batch = ensure_batch(batch)
+        return output.logits, batch.target

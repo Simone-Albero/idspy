@@ -1,4 +1,4 @@
-from typing import Sequence, Optional, Callable, Mapping, Any, Tuple
+from typing import Sequence, Optional, Callable, Mapping, Any
 
 import torch
 from torch import nn
@@ -6,7 +6,7 @@ from torch import nn
 from .base import BaseModel, ModelOutput
 from ..module.mlp import MLPBlock
 from ..module.embedding import EmbeddingBlock
-from ....data.torch.batch import Batch
+from ....data.torch.batch import Batch, ensure_batch
 
 
 class MLPClassifier(BaseModel):
@@ -42,15 +42,18 @@ class MLPClassifier(BaseModel):
         # Classification head
         self.classifier_head = nn.Linear(feat_dim, num_classes, bias=bias)
 
-    def forward(self, x: torch.Tensor) -> ModelOutput:
+    def forward(self, batch: Batch | Mapping[str, Any]) -> ModelOutput:
         """Forward pass.
 
         Args:
-            x: Input tensor of shape [batch_size, features]
+            batch: Batch object or mapping with 'features' key containing tensor of shape [batch_size, features]
 
         Returns:
             Model output with 'logits' and 'latents'
         """
+        batch = ensure_batch(batch)
+        x = batch.features
+
         if not torch.is_tensor(x):
             raise TypeError("Expected tensor features")
         if x.dim() != 2:
@@ -59,19 +62,6 @@ class MLPClassifier(BaseModel):
         latents = self.feature_extractor(x)
         logits = self.classifier_head(latents)
         return ModelOutput(logits=logits, latents=latents)
-
-    def for_loss(
-        self,
-        output: ModelOutput,
-        batch: Batch | Mapping[str, Any],
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Prepares arguments for the loss function."""
-        if isinstance(batch, Mapping):
-            target = batch.get("target")
-        else:
-            target = batch.target
-
-        return output.logits, target
 
 
 class TabularClassifier(MLPClassifier):
@@ -104,15 +94,17 @@ class TabularClassifier(MLPClassifier):
         )
         self.embedding = embedding
 
-    def forward(self, x: Mapping[str, Any]) -> ModelOutput:
+    def forward(self, batch: Batch | Mapping[str, Any]) -> ModelOutput:
         """Forward pass.
 
         Args:
-            x: features dict containing 'num' and 'cat' keys
+            batch: Batch object or mapping with 'features' key containing dict with 'numerical' and 'categorical' keys
 
         Returns:
             Model output with 'logits' and 'latents'
         """
+        batch = ensure_batch(batch)
+        x = batch.features
 
         if not isinstance(x, Mapping):
             raise TypeError(
@@ -129,16 +121,3 @@ class TabularClassifier(MLPClassifier):
         logits = self.classifier_head(latents)
 
         return ModelOutput(logits=logits, latents=latents)
-
-    def for_loss(
-        self,
-        output: ModelOutput,
-        batch: Batch | Mapping[str, Any],
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Prepares arguments for the loss function."""
-        if isinstance(batch, Mapping):
-            target = batch.get("target")
-        else:
-            target = batch.target
-
-        return output.logits, target
