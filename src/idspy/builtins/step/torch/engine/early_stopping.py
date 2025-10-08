@@ -7,7 +7,7 @@ from .....nn.torch.model.base import BaseModel
 logger = logging.getLogger(__name__)
 
 
-@Step.needs(avg_loss=float, model=BaseModel)
+@Step.needs("metrics", "model")
 class EarlyStopping(Step):
     """Early stopping step to monitor a metric and stop training if no improvement is seen."""
 
@@ -17,7 +17,7 @@ class EarlyStopping(Step):
         mode: str = "min",
         min_delta: float = 0.0,
         model_key: str = "model",
-        avg_loss_key: str = "val.avg_loss",
+        metrics_key: str = "val.metrics",
         stop_key: str = "stop_pipeline",
         name: Optional[str] = None,
     ) -> None:
@@ -39,12 +39,21 @@ class EarlyStopping(Step):
             self.best_score = -float("inf")
 
         self.key_map = {
-            "history": avg_loss_key,
+            "metrics": metrics_key,
             "model": model_key,
             "stop_training": stop_key,
         }
 
-    def compute(self, avg_loss: float, model: BaseModel) -> Optional[Dict[str, Any]]:
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def compute(
+        self, metrics: Dict[str, Any], model: BaseModel
+    ) -> Optional[Dict[str, Any]]:
+        avg_loss = metrics.get("avg_loss")
+        if avg_loss is None:
+            raise ValueError("metrics must contain 'avg_loss' key")
+
         if self.best_score is None:
             self.best_score = avg_loss
             self.num_bad_epochs = 0
@@ -55,6 +64,7 @@ class EarlyStopping(Step):
             self.num_bad_epochs = 0
             self.best_model = model
         else:
+            logger.info(f"EARLY_STOPPING {self.best_score:.6f} // {avg_loss:.6f}.")
             logger.info(f"EARLY_STOPPING {self.num_bad_epochs+1}/{self.patience}")
             self.num_bad_epochs += 1
 
