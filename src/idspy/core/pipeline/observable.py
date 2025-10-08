@@ -2,6 +2,7 @@ from typing import Any, Optional, Sequence, Dict
 
 from .base import Pipeline, PipelineEvent
 from .fittable import FittablePipeline
+from .repeatable import RepeatablePipeline, StoragePredicate
 from ..step.base import Step
 from ..events.bus import EventBus
 from ..storage.base import Storage
@@ -72,5 +73,30 @@ class ObservableFittablePipeline(ObservablePipeline, FittablePipeline):
         refit: bool = False,
         name: Optional[str] = None,
     ) -> None:
-        ObservablePipeline.__init__(self, steps, storage, bus, name)
+        ObservablePipeline.__init__(self, steps, storage, bus=bus, name=name)
         FittablePipeline.__init__(self, steps, storage, refit=refit, name=name)
+
+
+class ObservableRepeatablePipeline(ObservablePipeline, RepeatablePipeline):
+    """A RepeatablePipeline that also publishes lifecycle events to an EventBus."""
+
+    def __init__(
+        self,
+        steps: Sequence[Step],
+        storage: Storage,
+        bus: EventBus,
+        count: int = 1,
+        clear_storage: bool = True,
+        predicate: Optional[StoragePredicate] = None,
+        name: Optional[str] = None,
+    ) -> None:
+        ObservablePipeline.__init__(self, steps, storage, bus=bus, name=name)
+        RepeatablePipeline.__init__(
+            self,
+            steps,
+            storage,
+            count=count,
+            clear_storage=clear_storage,
+            predicate=predicate,
+            name=name,
+        )
