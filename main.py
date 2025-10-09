@@ -41,11 +41,16 @@ from src.idspy.builtins.step.nn.torch.engine.validate import (
     ValidateOneEpoch,
     MakePredictions,
 )
+from src.idspy.builtins.step.nn.torch.engine.tensor import CatTensors
 from src.idspy.builtins.step.nn.torch.engine.early_stopping import EarlyStopping
 from src.idspy.builtins.step.nn.torch.model.io import LoadModelWeights, SaveModelWeights
 from src.idspy.builtins.step.nn.torch.metric.classification import ClassificationMetrics
-from src.idspy.builtins.step.nn.torch.log.tensorboard import TensorBoardLogger
+from src.idspy.builtins.step.nn.torch.log.tensorboard import (
+    MetricsLogger,
+    WeightsLogger,
+)
 
+from src.idspy.builtins.step.ml.cluster.score import ClusteringScores
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -186,7 +191,7 @@ def main():
                 collate_fn=default_collate,
             ),
             TrainOneEpoch(),
-            TensorBoardLogger(log_dir="resources/logs", metrics_key="train.metrics"),
+            MetricsLogger(log_dir="resources/logs", metrics_key="train.metrics"),
             SaveModelWeights(file_path="resources/models/cic_2018_v2/model.pt"),
             ValidateOneEpoch(
                 dataloader_key="test.dataloader",
@@ -200,20 +205,37 @@ def main():
                 model_key="model",
                 stop_key="stop_pipeline",
             ),
+            CatTensors(
+                inputs_key="test.outputs",
+                input_section="logits",
+                outputs_key="test.logits",
+            ),
+            CatTensors(
+                inputs_key="test.outputs",
+                input_section="latents",
+                outputs_key="test.latents",
+            ),
             MakePredictions(
                 pred_fn=lambda x: torch.argmax(x, dim=1),
-                outputs_key="test.outputs",
-                predictions_key="test.predictions",
+                inputs_key="test.logits",
+                outputs_key="test.predictions",
             ),
             ClassificationMetrics(
                 predictions_key="test.predictions",
                 targets_key="test.targets",
                 metrics_key="test.metrics",
             ),
-            TensorBoardLogger(log_dir="resources/logs", metrics_key="test.metrics"),
+            MetricsLogger(log_dir="resources/logs", metrics_key="test.metrics"),
+            WeightsLogger(log_dir="resources/logs", model_key="model"),
+            # ClusteringScores(
+            #     vectors_key="test.latents",
+            #     targets_key="test.targets",
+            #     outputs_key="test.clustering_scores",
+            #     scale_inputs=True,
+            # ),
         ],
         bus=bus,
-        count=100,
+        count=1,
         clear_storage=False,
         predicate=lambda storage: storage.get("stop_pipeline"),
         name="training_pipeline",
@@ -223,6 +245,7 @@ def main():
     # preprocessing_pipeline.run()
     training_pipeline.run()
     print(storage.get(["test.metrics"]))
+    print(storage.get(["test.clustering_scores"]))
 
 
 if __name__ == "__main__":
