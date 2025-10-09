@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 import numpy as np
 
 from ......core.step.base import Step
+from ......plot.score import confusion_matrix_to_plot, dict_to_bar_plot
 
 
 @Step.needs("predictions", "targets")
@@ -15,9 +16,11 @@ class ClassificationMetrics(Step):
         predictions_key: str = "predictions",
         targets_key: str = "targets",
         metrics_key: str = "classification_metrics",
+        class_names: Optional[list] = None,
     ) -> None:
 
         super().__init__(name=name or "classification_metrics")
+        self.class_names = class_names
         self.key_map = {
             "predictions": predictions_key,
             "targets": targets_key,
@@ -37,24 +40,35 @@ class ClassificationMetrics(Step):
             confusion_matrix,
         )
 
-        f1_per_class = f1_score(y_true, y_pred, average=None, zero_division=0).tolist()
-        f1_macro = f1_score(y_true, y_pred, average="macro")
-        f1_micro = f1_score(y_true, y_pred, average="micro")
-        f1_weighted = f1_score(y_true, y_pred, average="weighted")
-
-        cm = confusion_matrix(y_true, y_pred)
-
-        metrics = {
+        base_metrics = {
             "accuracy": accuracy_score(y_true, y_pred),
             "precision": precision_score(
                 y_true, y_pred, average="macro", zero_division=0
             ),
             "recall": recall_score(y_true, y_pred, average="macro", zero_division=0),
-            "f1_macro": f1_macro,
-            "f1_micro": f1_micro,
-            "f1_weighted": f1_weighted,
-            "f1_per_class": f1_per_class,
-            "confusion_matrix": cm,
+            "f1_macro": f1_score(y_true, y_pred, average="macro"),
+            "f1_micro": f1_score(y_true, y_pred, average="micro"),
+            "f1_weighted": f1_score(y_true, y_pred, average="weighted"),
+        }
+
+        class_metrics = {}
+
+        f1_per_class = f1_score(y_true, y_pred, average=None, zero_division=0).tolist()
+        class_names = (
+            [str(i) for i in range(len(f1_per_class))]
+            if self.class_names is None
+            else self.class_names
+        )
+
+        for class_name, f1 in zip(class_names, f1_per_class):
+            class_metrics[f"f1_{class_name}"] = f1
+
+        cm = confusion_matrix(y_true, y_pred)
+
+        metrics = {
+            "base_metrics": dict_to_bar_plot(base_metrics),
+            "class_metrics": dict_to_bar_plot(class_metrics),
+            "confusion_matrix": confusion_matrix_to_plot(cm),
         }
 
         return metrics

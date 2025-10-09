@@ -10,3 +10,4 @@ hydra-core
 pyclustertend
 pyarrow
 tensorboard
+seaborn

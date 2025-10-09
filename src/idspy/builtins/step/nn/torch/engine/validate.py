@@ -2,8 +2,6 @@ from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import torch
-from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 
 from ......core.step.base import Step
 from ......nn.torch.model.base import BaseModel, ModelOutput
@@ -104,35 +102,28 @@ class ForwardOnce(Step):
         return {"outputs": out}
 
 
-@Step.needs("outputs")
+@Step.needs("inputs")
 class MakePredictions(Step):
     """Make predictions from model outputs."""
 
     def __init__(
         self,
         pred_fn: Callable,
+        inputs_key: str = "inputs",
         outputs_key: str = "outputs",
-        predictions_key: str = "predictions",
         name: Optional[str] = None,
     ) -> None:
         self.pred_fn = pred_fn
 
         super().__init__(name=name or "make_predictions")
         self.key_map = {
+            "inputs": inputs_key,
             "outputs": outputs_key,
-            "predictions": predictions_key,
         }
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def compute(self, outputs: List[ModelOutput]) -> Optional[Dict[str, Any]]:
-        predictions = []
-        for output in outputs:
-            prediction = (
-                make_predictions(output.logits, self.pred_fn).detach().cpu().numpy()
-            )
-            predictions.append(prediction)
-        predictions = np.concatenate(predictions, axis=0)
-
-        return {"predictions": predictions}
+    def compute(self, inputs: torch.Tensor) -> Optional[Dict[str, Any]]:
+        predictions = make_predictions(inputs, self.pred_fn).detach().cpu().numpy()
+        return {"outputs": predictions}
