@@ -113,9 +113,9 @@ def main():
 
     device = get_device()
     model = TabularClassifier(
-        num_features=len(schema.numerical),
+        num_numeric=len(schema.numerical),
         cat_cardinalities=[20] * len(schema.categorical),
-        num_classes=15,
+        out_features=15,
         hidden_dims=[128, 64],
         dropout=0.1,
     ).to(device)
