@@ -89,3 +89,17 @@ def dict_to_bar_plot(d: dict, title: str = "Metrics") -> plt.Figure:
     sns.barplot(x=list(d.keys()), y=list(d.values()), ax=ax)
     ax.set_title(title)
     return fig
+
+
+def roc_auc_plot(fpr: np.ndarray, tpr: np.ndarray, auc: float) -> plt.Figure:
+    """Plot ROC curve with AUC annotation."""
+    fig, ax = plt.subplots()
+    ax.plot(fpr, tpr, label=f"ROC curve (AUC = {auc:.2f})", color="blue")
+    ax.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Random guess")
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+    ax.set_title("ROC Curve")
+    ax.legend(loc="lower right")
+    ax.grid(True)
+    fig.tight_layout()
+    return fig
