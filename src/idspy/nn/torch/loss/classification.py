@@ -1,6 +1,5 @@
 from typing import Optional
 
-import torch
 from torch import Tensor
 import torch.nn.functional as F
 
@@ -40,13 +39,13 @@ class ClassificationLoss(BaseLoss):
 
     def forward(
         self,
-        pred: Tensor,
+        out: Tensor,
         target: Optional[Tensor],
     ) -> Tensor:
         """Compute cross-entropy loss.
 
         Args:
-            pred: Logits tensor [batch_size, num_classes]
+            out: Logits tensor [batch_size, num_classes]
             target: Target class indices [batch_size]
 
         Returns:
@@ -55,7 +54,7 @@ class ClassificationLoss(BaseLoss):
         class_weight = self.class_weight
 
         loss = F.cross_entropy(
-            pred,
+            out,
             target,
             weight=class_weight,
             ignore_index=self.ignore_index,
