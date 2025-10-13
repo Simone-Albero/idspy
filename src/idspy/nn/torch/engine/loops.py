@@ -6,7 +6,7 @@ from torch.nn.utils import clip_grad_norm_
 
 from ..model.base import BaseModel, ModelOutput
 from ..loss.base import BaseLoss
-from ....data.torch.batch import Batch, ensure_batch
+from ....data.torch.batch import Features, Batch, ensure_batch
 
 
 def _forward_and_loss(
@@ -15,12 +15,12 @@ def _forward_and_loss(
     loss_fn: Optional[BaseLoss] = None,
 ) -> Tuple[ModelOutput, Optional[torch.Tensor]]:
     """Forward pass with optional loss computation."""
-    outputs = model(batch)
+    outputs = model(batch.features)
 
-    if loss_fn is None or batch.target is None:
+    if loss_fn is None or batch.targets is None:
         return outputs, None
 
-    loss = loss_fn(*model.for_loss(outputs, batch))
+    loss = loss_fn(*model.for_loss(outputs, batch.targets))
     return outputs, loss
 
 

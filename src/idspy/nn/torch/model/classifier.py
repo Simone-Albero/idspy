@@ -1,4 +1,4 @@
-from typing import Sequence, Optional, Callable, Mapping, Any
+from typing import Sequence, Optional, Callable
 
 import torch
 from torch import nn
@@ -6,7 +6,7 @@ from torch import nn
 from .base import BaseModel, ModelOutput
 from ..module.mlp import MLPBlock
 from ..module.embedding import EmbeddingBlock
-from ....data.torch.batch import Batch, ensure_batch
+from ....data.torch.batch import Features
 
 
 class MLPClassifier(BaseModel):
@@ -15,7 +15,7 @@ class MLPClassifier(BaseModel):
     def __init__(
         self,
         in_features: int,
-        num_classes: int,
+        out_features: int,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
         activation: Callable[[], nn.Module] = nn.ReLU,
@@ -40,25 +40,17 @@ class MLPClassifier(BaseModel):
         )
 
         # Classification head
-        self.classifier_head = nn.Linear(feat_dim, num_classes, bias=bias)
+        self.classifier_head = nn.Linear(feat_dim, out_features, bias=bias)
 
-    def forward(self, batch: Batch | Mapping[str, Any]) -> ModelOutput:
+    def forward(self, x: Features) -> ModelOutput:
         """Forward pass.
 
         Args:
-            batch: Batch object or mapping with 'features' key containing tensor of shape [batch_size, features]
+            x: Features object containing tensor of shape [batch_size, features]
 
         Returns:
             Model output with 'logits' and 'latents'
         """
-        batch = ensure_batch(batch)
-        x = batch.features
-
-        if not torch.is_tensor(x):
-            raise TypeError("Expected tensor features")
-        if x.dim() != 2:
-            raise ValueError("Expected 2D tensor [batch_size, features]")
-
         latents = self.feature_extractor(x)
         logits = self.classifier_head(latents)
         return ModelOutput(logits=logits, latents=latents)
@@ -69,9 +61,9 @@ class TabularClassifier(MLPClassifier):
 
     def __init__(
         self,
-        num_features: int,
+        num_numeric: int,
         cat_cardinalities: Sequence[int],
-        num_classes: int,
+        out_features: int,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
         activation: Callable[[], nn.Module] = nn.ReLU,
@@ -82,10 +74,10 @@ class TabularClassifier(MLPClassifier):
         embedding = EmbeddingBlock(list(cat_cardinalities), emb_dim=emb_dim)
         emb_dim_total = sum(embedding.embedding_dims)
 
-        in_features = num_features + emb_dim_total
+        in_features = num_numeric + emb_dim_total
         super().__init__(
             in_features=in_features,
-            num_classes=num_classes,
+            out_features=out_features,
             hidden_dims=hidden_dims,
             dropout=dropout,
             activation=activation,
@@ -94,23 +86,15 @@ class TabularClassifier(MLPClassifier):
         )
         self.embedding = embedding
 
-    def forward(self, batch: Batch | Mapping[str, Any]) -> ModelOutput:
+    def forward(self, x: Features) -> ModelOutput:
         """Forward pass.
 
         Args:
-            batch: Batch object or mapping with 'features' key containing dict with 'numerical' and 'categorical' keys
+            x: Features object containing dict with 'numerical' and 'categorical' keys
 
         Returns:
             Model output with 'logits' and 'latents'
         """
-        batch = ensure_batch(batch)
-        x = batch.features
-
-        if not isinstance(x, Mapping):
-            raise TypeError(
-                "Expected features dict with 'numerical' and 'categorical' keys"
-            )
-
         x_num = x["numerical"]
         x_cat = x["categorical"]
 

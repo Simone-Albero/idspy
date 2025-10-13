@@ -1,43 +1,41 @@
-from typing import Any, Dict, Mapping, NamedTuple, Optional, Tuple
+from typing import Optional, Tuple, Union
 
 from torch import nn, Tensor
 import torch
-from ....data.torch.batch import Batch, ensure_batch
+from ....data.torch.batch import Features
 
 
-class ModelOutput(NamedTuple):
-    logits: Tensor
-    latents: Optional[Tensor] = None
-    extras: Optional[Dict[str, Tensor]] = None
+class ModelOutput(dict):
+    """Model output container.
+
+    Expected to contain at least 'logits' or 'latents' keys and other optional tensors.
+    """
+
+    @property
+    def logits(self) -> Tensor:
+        if "logits" not in self:
+            raise KeyError("ModelOutput must contain 'logits'")
+        return self["logits"]
+
+    @property
+    def latents(self) -> Optional[Tensor]:
+        if "latents" not in self:
+            raise KeyError("ModelOutput must contain 'latents'")
+        return self.get("latents")
 
     def detach(self) -> "ModelOutput":
-        return ModelOutput(
-            logits=self.logits.detach(),
-            latents=None if self.latents is None else self.latents.detach(),
-            extras=(
-                None
-                if self.extras is None
-                else {k: v.detach() for k, v in self.extras.items()}
-            ),
-        )
+        detached = {}
+        for k, v in self.items():
+            detached[k] = v.detach() if isinstance(v, Tensor) else v
+        return ModelOutput(detached)
 
     def to(self, device: torch.device, non_blocking: bool = True) -> "ModelOutput":
-        return ModelOutput(
-            logits=self.logits.to(device, non_blocking=non_blocking),
-            latents=(
-                None
-                if self.latents is None
-                else self.latents.to(device, non_blocking=non_blocking)
-            ),
-            extras=(
-                None
-                if self.extras is None
-                else {
-                    k: v.to(device, non_blocking=non_blocking)
-                    for k, v in self.extras.items()
-                }
-            ),
-        )
+        moved = {}
+        for k, v in self.items():
+            moved[k] = (
+                v.to(device, non_blocking=non_blocking) if isinstance(v, Tensor) else v
+            )
+        return ModelOutput(moved)
 
 
 class BaseModel(nn.Module):
@@ -45,11 +43,11 @@ class BaseModel(nn.Module):
     Base class for models. Defines the interface for forward and loss_inputs methods.
     """
 
-    def forward(self, batch: Batch | Mapping[str, Any]) -> ModelOutput:
+    def forward(self, features: Features) -> ModelOutput:
         """
         Forward pass. Must be implemented by subclasses.
         Args:
-            batch: Batch or mapping compatible with Batch.
+            features: Features containing tensors or dictionary-like tensors.
         Returns:
             ModelOutput: NamedTuple, expected to contain at least 'logits'.
         """
@@ -58,11 +56,10 @@ class BaseModel(nn.Module):
     def for_loss(
         self,
         output: ModelOutput,
-        batch: Batch | Mapping[str, Any],
+        targets: Union[Tensor, Features],
     ) -> Tuple[Tensor, Tensor]:
         """
         Prepares arguments for the loss function. Default: pred=output['logits'], target=batch.target.
         Override if your model/loss requires different fields.
         """
-        batch = ensure_batch(batch)
-        return output.logits, batch.target
+        return output.logits, targets

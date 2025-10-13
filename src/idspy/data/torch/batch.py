@@ -28,7 +28,7 @@ class Batch:
     """
 
     features: Features
-    target: Optional[Tensor] = None
+    targets: Optional[Features] = None
 
     def to(self, device: torch.device, non_blocking: bool = True) -> "Batch":
         """
@@ -38,10 +38,10 @@ class Batch:
             features=_map_tensors(
                 self.features, lambda t: t.to(device, non_blocking=non_blocking)
             ),
-            target=(
+            targets=(
                 None
-                if self.target is None
-                else self.target.to(device, non_blocking=non_blocking)
+                if self.targets is None
+                else self.targets.to(device, non_blocking=non_blocking)
             ),
         )
 
@@ -51,23 +51,23 @@ class Batch:
         """
         return Batch(
             features=_map_tensors(self.features, lambda t: t.detach()),
-            target=None if self.target is None else self.target.detach(),
+            targets=None if self.targets is None else self.targets.detach(),
         )
 
     def as_dict(self) -> Dict[str, Any]:
         """
         Return the batch as a dictionary.
         """
-        return {"features": self.features, "target": self.target}
+        return {"features": self.features, "targets": self.targets}
 
     def __getitem__(self, key: str) -> Any:
         """
-        Get an item from the batch by key ('features' or 'target').
+        Get an item from the batch by key ('features' or 'targets').
         """
         if key == "features":
             return self.features
-        if key == "target":
-            return self.target
+        if key == "targets":
+            return self.targets
         raise KeyError(key)
 
     def __iter__(self):
@@ -85,7 +85,7 @@ def ensure_batch(x: Batch | Mapping[str, Any]) -> Batch:
     if isinstance(x, Batch):
         return x
 
-    return Batch(features=x["features"], target=x.get("target"))
+    return Batch(features=x["features"], targets=x.get("targets"))
 
 
 def default_collate(samples: list[Mapping[str, Any]]) -> Batch:
@@ -108,8 +108,8 @@ def default_collate(samples: list[Mapping[str, Any]]) -> Batch:
         feature_list = [s["features"] for s in samples]
         features = stack(feature_list)
 
-    target = None
-    if "target" in samples[0] and samples[0]["target"] is not None:
-        target = stack([s["target"] for s in samples]).view(-1)
+    targets = None
+    if "targets" in samples[0] and samples[0]["targets"] is not None:
+        targets = stack([s["targets"] for s in samples]).view(-1)
 
-    return Batch(features=features, target=target)
+    return Batch(features=features, targets=targets)

@@ -16,14 +16,14 @@ class TensorDataset(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
-        target: Optional[pd.Series] = None,
+        targets: Optional[pd.Series] = None,
         feature_dtype: torch.dtype = torch.float32,
         target_dtype: torch.dtype = torch.long,
     ) -> None:
         self.features: torch.Tensor = torch.as_tensor(df.values, dtype=feature_dtype)
-        self.target: Optional[torch.Tensor] = (
-            torch.as_tensor(target.values, dtype=target_dtype)
-            if target is not None
+        self.targets: Optional[torch.Tensor] = (
+            torch.as_tensor(targets.values, dtype=target_dtype)
+            if targets is not None
             else None
         )
 
@@ -32,8 +32,8 @@ class TensorDataset(Dataset):
 
     def __getitem__(self, index: int) -> Sample:
         features = self.features[index]
-        target = self.target[index] if self.target is not None else features
-        return {"features": features, "target": target}
+        targets = self.targets[index] if self.targets is not None else features
+        return {"features": features, "targets": targets}
 
 
 class NumericalTensorDataset(TensorDataset):
@@ -48,10 +48,10 @@ class NumericalTensorDataset(TensorDataset):
         target_col: Optional[str] = None,
     ) -> None:
         df = df[feature_cols]
-        target = df[target_col] if target_col else None
+        targets = df[target_col] if target_col else None
         super().__init__(
             df,
-            target,
+            targets,
             feature_dtype=torch.float32,
             target_dtype=torch.long,
         )
@@ -69,11 +69,11 @@ class CategoricalTensorDataset(TensorDataset):
         target_col: Optional[str] = None,
     ) -> None:
         df = df[feature_cols]
-        target = df[target_col] if target_col else None
+        targets = df[target_col] if target_col else None
 
         super().__init__(
             df,
-            target,
+            targets,
             feature_dtype=torch.long,
             target_dtype=torch.long,
         )
@@ -96,7 +96,7 @@ class MixedTabularDataset(Dataset):
             df, categorical_cols, target_col=None
         )
 
-        self.target: Optional[torch.Tensor] = (
+        self.targets: Optional[torch.Tensor] = (
             torch.as_tensor(df[target_col].values, dtype=torch.long)
             if target_col
             else None
@@ -112,5 +112,5 @@ class MixedTabularDataset(Dataset):
             "numerical": numerical_sample["features"],
             "categorical": categorical_sample["features"],
         }
-        target = self.target[index] if self.target is not None else features
-        return {"features": features, "target": target}
+        targets = self.targets[index] if self.targets is not None else features
+        return {"features": features, "targets": targets}
