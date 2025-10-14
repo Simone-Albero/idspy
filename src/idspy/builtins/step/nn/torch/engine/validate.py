@@ -8,8 +8,10 @@ from ......nn.torch.model.base import BaseModel, ModelOutput
 from ......nn.torch.loss.base import BaseLoss
 from ......nn.torch.engine.loops import eval_epoch
 from ......nn.torch.engine.forward import forward_pass, make_predictions
+from ....factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("dataloader", "model", "loss_fn", "device")
 class ValidateOneEpoch(Step):
     """Validate a model for one epoch (no gradient updates)."""
@@ -64,6 +66,7 @@ class ValidateOneEpoch(Step):
         }
 
 
+@StepFactory.register()
 @Step.needs("inputs", "model", "device")
 class ForwardOnce(Step):
     """Compute a single forward pass: model(input_tensor) -> output."""
@@ -102,13 +105,14 @@ class ForwardOnce(Step):
         return {"outputs": out}
 
 
+@StepFactory.register()
 @Step.needs("inputs")
 class MakePredictions(Step):
     """Make predictions from model outputs."""
 
     def __init__(
         self,
-        pred_fn: Callable,
+        pred_fn: Callable = lambda x: torch.argmax(x, dim=1),
         inputs_key: str = "inputs",
         outputs_key: str = "outputs",
         name: Optional[str] = None,

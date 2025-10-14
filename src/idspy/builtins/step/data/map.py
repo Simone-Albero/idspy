@@ -7,8 +7,10 @@ from pandas.api.types import CategoricalDtype
 
 from ....core.step.base import Step
 from ....core.step.fittable import FittableStep
+from ..factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("df")
 class FrequencyMap(FittableStep):
     """Map categorical columns to frequency-rank codes."""
@@ -71,6 +73,7 @@ class FrequencyMap(FittableStep):
         return {"df": df, "cat_mapping": self.cat_types}
 
 
+@StepFactory.register()
 @Step.needs("df")
 class LabelMap(FittableStep):
     """Encode `target`: binary with `benign_tag`, else ordinal categories."""

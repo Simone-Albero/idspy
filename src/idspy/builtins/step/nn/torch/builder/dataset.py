@@ -8,8 +8,10 @@ from ......data.torch.dataset import (
     NumericalTensorDataset,
     MixedTabularDataset,
 )
+from ....factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("df")
 class BuildDataset(Step):
     """Build dataset from dataframe in state."""

@@ -6,8 +6,10 @@ from sklearn.preprocessing import StandardScaler
 from pyclustertend import hopkins as hopkins_score
 
 from .....core.step.base import Step
+from ...factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("vectors", "targets")
 class ClusteringScores(Step):
     """Compute clustering metrics: Hopkins, Silhouette, and Adjusted Rand Index."""

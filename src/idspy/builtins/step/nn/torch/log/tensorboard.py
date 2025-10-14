@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 import torch
 
 from ......core.step.base import Step
+from ....factory import StepFactory
 
 
 def _auto_detect_prefix(metrics_key: str) -> str:
@@ -19,6 +20,7 @@ def _auto_detect_prefix(metrics_key: str) -> str:
         return ""
 
 
+@StepFactory.register()
 @Step.needs("metrics")
 class MetricsLogger(Step):
     """Log metrics to TensorBoard."""
@@ -99,6 +101,7 @@ class MetricsLogger(Step):
         self.close()
 
 
+@StepFactory.register()
 @Step.needs("model")
 class WeightsLogger(Step):
     """Log model weights and gradients to TensorBoard with focus on detecting dead/exploding gradients and parameters."""

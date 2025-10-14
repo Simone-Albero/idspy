@@ -1,9 +1,10 @@
 defaults:
   - model: tabular_classifier
   - data: cic_2018_v2
-  - loops: default
+  - loop: default
   - optimizer: adamw
-  - paths: default
+  - path: default
+  - pipeline: baseline
   - _self_
 
 # Global settings

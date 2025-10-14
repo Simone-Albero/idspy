@@ -4,8 +4,10 @@ import pandas as pd
 
 from ....core.step.base import Step
 from ....data.partition import random_split, stratified_split
+from ..factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("df", "seed")
 class RandomSplit(Step):
     """Random split into train/val/test."""
@@ -51,6 +53,7 @@ class RandomSplit(Step):
         return {"split_mapping": split_mapping, "df": df}
 
 
+@StepFactory.register()
 @Step.needs("df", "seed")
 class StratifiedSplit(Step):
     """Stratified split into train/val/test."""
@@ -102,6 +105,7 @@ class StratifiedSplit(Step):
         return {"split_mapping": split_mapping, "df": df}
 
 
+@StepFactory.register()
 @Step.needs("df")
 class AllocateSplitPartitions(Step):
     def __init__(
@@ -127,6 +131,7 @@ class AllocateSplitPartitions(Step):
         return {"train": df.tab.train, "val": df.tab.val, "test": df.tab.test}
 
 
+@StepFactory.register()
 @Step.needs("df")
 class AllocateTargets(Step):
     def __init__(

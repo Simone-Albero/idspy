@@ -4,8 +4,10 @@ import pandas as pd
 
 from ....core.step.base import Step
 from ....data.tab_accessor import reattach_meta
+from ..factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("df")
 class DownsampleToMinority(Step):
     """Downsample each class to the size of the minority class."""
@@ -48,6 +50,7 @@ class DownsampleToMinority(Step):
         return {"df": reattach_meta(df, sampled)}
 
 
+@StepFactory.register()
 @Step.needs("df")
 class Downsample(Step):
     """Downsample rows globally or per class."""
