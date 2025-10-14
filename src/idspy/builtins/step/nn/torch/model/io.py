@@ -6,8 +6,10 @@ from ......common.utils import PathLike
 from ......core.step.base import Step
 from ......nn.torch.model.base import BaseModel
 from ......nn.torch.module.repository import ModulesRepository
+from ....factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("model", "device")
 class LoadModelWeights(Step):
     """Load model from state."""
@@ -47,6 +49,7 @@ class LoadModelWeights(Step):
         return {"model": model}
 
 
+@StepFactory.register()
 @Step.needs("model")
 class SaveModelWeights(Step):
     """Save model from state."""
