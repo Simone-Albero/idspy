@@ -1,0 +1,19 @@
+defaults:
+  - model: tabular_classifier
+  - data: cic_2018_v2
+  - loops: default
+  - optimizer: adamw
+  - paths: default
+  - _self_
+
+# Global settings
+seed: 42
+device: auto  # auto, cpu, cuda, mps
+max_frequency_levels: 20
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job:
+    chdir: False

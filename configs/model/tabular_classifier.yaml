@@ -1,0 +1,11 @@
+_target_: src.idspy.nn.torch.model.classifier.TabularClassifier
+name: tabular_classifier
+
+# Architecture
+hidden_dims: [128, 64]
+dropout: 0.1
+out_features: 15
+
+# Will be set dynamically based on data
+num_numeric: null
+cat_cardinalities: null
