@@ -1,9 +1,11 @@
 import logging
 
 import torch
+from omegaconf import DictConfig
 
 from src.idspy.common.logging import setup_logging
 from src.idspy.common.utils import set_seeds
+from src.idspy.common.config import load_config
 
 from src.idspy.core.storage.dict import DictStorage
 from src.idspy.core.pipeline.base import PipelineEvent
@@ -54,80 +56,39 @@ from src.idspy.builtins.step.ml.cluster.score import ClusteringScores
 
 setup_logging()
 logger = logging.getLogger(__name__)
-set_seeds(42)
 
 
-def main():
+def main(cfg: DictConfig):
+    set_seeds(cfg.seed)
+
     schema = Schema()
-    schema.add(["Attack"], ColumnRole.TARGET)
-    schema.add(
-        [
-            "IN_BYTES",
-            "IN_PKTS",
-            "OUT_BYTES",
-            "OUT_PKTS",
-            "FLOW_DURATION_MILLISECONDS",
-            "DURATION_IN",
-            "DURATION_OUT",
-            "MIN_TTL",
-            "MAX_TTL",
-            "LONGEST_FLOW_PKT",
-            "SHORTEST_FLOW_PKT",
-            "MIN_IP_PKT_LEN",
-            "MAX_IP_PKT_LEN",
-            "SRC_TO_DST_SECOND_BYTES",
-            "DST_TO_SRC_SECOND_BYTES",
-            "RETRANSMITTED_IN_BYTES",
-            "RETRANSMITTED_IN_PKTS",
-            "RETRANSMITTED_OUT_BYTES",
-            "RETRANSMITTED_OUT_PKTS",
-            "SRC_TO_DST_AVG_THROUGHPUT",
-            "DST_TO_SRC_AVG_THROUGHPUT",
-            "NUM_PKTS_UP_TO_128_BYTES",
-            "NUM_PKTS_128_TO_256_BYTES",
-            "NUM_PKTS_256_TO_512_BYTES",
-            "NUM_PKTS_512_TO_1024_BYTES",
-            "NUM_PKTS_1024_TO_1514_BYTES",
-            "TCP_WIN_MAX_IN",
-            "TCP_WIN_MAX_OUT",
-            "DNS_TTL_ANSWER",
-        ],
-        ColumnRole.NUMERICAL,
-    )
-    schema.add(
-        [
-            "L4_SRC_PORT",
-            "L4_DST_PORT",
-            "PROTOCOL",
-            "L7_PROTO",
-            "TCP_FLAGS",
-            "CLIENT_TCP_FLAGS",
-            "SERVER_TCP_FLAGS",
-            "ICMP_TYPE",
-            "ICMP_IPV4_TYPE",
-            "DNS_QUERY_ID",
-            "DNS_QUERY_TYPE",
-        ],
-        ColumnRole.CATEGORICAL,
-    )
+    schema.add(cfg.data.target_columns, ColumnRole.TARGET)
+    schema.add(cfg.data.numerical_columns, ColumnRole.NUMERICAL)
+    schema.add(cfg.data.categorical_columns, ColumnRole.CATEGORICAL)
 
-    device = get_device()
+    if cfg.device == "auto":
+        device = get_device()
+    else:
+        device = torch.device(cfg.device)
+
     model = TabularClassifier(
         num_numeric=len(schema.numerical),
-        cat_cardinalities=[20] * len(schema.categorical),
-        out_features=15,
-        hidden_dims=[128, 64],
-        dropout=0.1,
+        cat_cardinalities=[cfg.max_frequency_levels] * len(schema.categorical),
+        out_features=cfg.model.out_features,
+        hidden_dims=cfg.model.hidden_dims,
+        dropout=cfg.model.dropout,
     ).to(device)
+
     loss = ClassificationLoss().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.optimizer.lr)
+
     storage = DictStorage(
         {
             "device": device,
             "model": model,
             "loss_fn": loss,
             "optimizer": optimizer,
-            "seed": 42,
+            "seed": cfg.seed,
             "stop_pipeline": False,
         }
     )
@@ -138,7 +99,7 @@ def main():
     fit_aware_pipeline = ObservableFittablePipeline(
         steps=[
             StandardScale(),
-            FrequencyMap(max_levels=20),
+            FrequencyMap(max_levels=cfg.max_frequency_levels),
             LabelMap(),
         ],
         name="fit_aware_pipeline",
@@ -149,17 +110,18 @@ def main():
     preprocessing_pipeline = ObservablePipeline(
         steps=[
             LoadData(
-                file_path="resources/data/dataset_v2/cic_2018_v2.csv",
-                schema=schema,
+                file_path=cfg.paths.data_raw,
+                file_name=cfg.data.file_name,
+                fmt=cfg.data.format,
             ),
             DropNulls(),
             # DownsampleToMinority(class_column=schema.columns(ColumnRole.TARGET)[0]),
             StratifiedSplit(class_column=schema.target),
             fit_aware_pipeline,
             SaveData(
-                file_path="resources/data/processed",
-                file_name="cic_2018_v2",
-                fmt="parquet",
+                file_path=cfg.paths.data_processed,
+                file_name=cfg.data.file_name,
+                fmt=cfg.data.format,
             ),
         ],
         storage=storage,
@@ -169,30 +131,39 @@ def main():
 
     training_pipeline = ObservableRepeatablePipeline(
         steps=[
-            LoadData(file_path="resources/data/processed/cic_2018_v2.parquet"),
+            LoadData(
+                file_path=cfg.paths.data_processed,
+                file_name=cfg.data.file_name,
+                fmt=cfg.data.format,
+            ),
             AllocateSplitPartitions(),
             AllocateTargets(df_key="test.data", targets_key="test.targets"),
             BuildDataset(df_key="train.data", dataset_key="train.dataset"),
             BuildDataLoader(
                 dataset_key="train.dataset",
                 dataloader_key="train.dataloader",
-                batch_size=512,
-                num_workers=6,
-                shuffle=True,
+                batch_size=cfg.loops.train.dataloader.batch_size,
+                num_workers=cfg.loops.train.dataloader.num_workers,
+                shuffle=cfg.loops.train.dataloader.shuffle,
+                pin_memory=cfg.loops.train.dataloader.pin_memory,
                 collate_fn=default_collate,
             ),
             BuildDataset(df_key="test.data", dataset_key="test.dataset"),
             BuildDataLoader(
                 dataset_key="test.dataset",
                 dataloader_key="test.dataloader",
-                batch_size=1024,
-                num_workers=6,
-                shuffle=False,
+                batch_size=cfg.loops.test.dataloader.batch_size,
+                num_workers=cfg.loops.test.dataloader.num_workers,
+                shuffle=cfg.loops.test.dataloader.shuffle,
+                pin_memory=cfg.loops.test.dataloader.pin_memory,
                 collate_fn=default_collate,
             ),
             TrainOneEpoch(),
-            MetricsLogger(log_dir="resources/logs", metrics_key="train.metrics"),
-            SaveModelWeights(file_path="resources/models/cic_2018_v2/model.pt"),
+            MetricsLogger(log_dir=cfg.paths.logs, metrics_key="train.metrics"),
+            SaveModelWeights(
+                file_path=cfg.paths.models,
+                file_name=cfg.model.name,
+            ),
             ValidateOneEpoch(
                 dataloader_key="test.dataloader",
                 metrics_key="test.metrics",
@@ -249,4 +220,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    cfg = load_config(config_path="configs", config_name="config")
+    main(cfg)
