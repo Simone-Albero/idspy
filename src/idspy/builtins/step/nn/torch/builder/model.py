@@ -1,6 +1,6 @@
 from typing import Optional, Any, Dict
 
-from idspy.nn import torch
+import torch
 
 from ......core.step.base import Step
 

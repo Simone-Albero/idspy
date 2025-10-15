@@ -5,6 +5,7 @@ defaults:
   - optimizer: adamw
   - path: default
   - pipeline: baseline
+  - loss: classification
   - _self_
 
 # Global settings

@@ -17,8 +17,6 @@ from src.idspy.core.pipeline.observable import (
 from src.idspy.core.events.bus import EventBus
 
 from src.idspy.nn.torch.helper import get_device
-from src.idspy.nn.torch.model.classifier import TabularClassifier
-from src.idspy.nn.torch.loss.classification import ClassificationLoss
 
 from src.idspy.builtins.handler.logging import Logger
 
@@ -40,24 +38,10 @@ def main(cfg: DictConfig):
     else:
         device = torch.device(cfg.device)
 
-    # Setup model
-    model = TabularClassifier(
-        num_numeric=len(cfg.data.numerical_columns),
-        cat_cardinalities=[cfg.max_cat_levels] * len(cfg.data.categorical_columns),
-        out_features=cfg.model.out_features,
-        hidden_dims=cfg.model.hidden_dims,
-        dropout=cfg.model.dropout,
-    ).to(device)
-
-    loss = ClassificationLoss().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.optimizer.lr)
-
     # Setup storage
     storage = DictStorage(
         {
             "device": device,
-            "loss_fn": loss,
-            "optimizer": optimizer,
             "seed": cfg.seed,
             "stop_pipeline": False,
         }

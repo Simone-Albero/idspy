@@ -50,6 +50,15 @@ training:
       model_config: ${model}
       model_key: model
 
+    - _target_: build_loss
+      loss_config: ${loss}
+      loss_key: loss_fn
+
+    - _target_: build_optimizer
+      optimizer_config: ${optimizer}
+      model_key: model
+      optimizer_key: optimizer
+
     - _target_: build_dataset
       df_key: train.data
       dataset_key: train.dataset
