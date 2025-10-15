@@ -10,7 +10,7 @@ from torch.profiler import (
 
 from ......core.step.base import Step
 from ......core.step.contextual import ContextualStep
-from ....factory import StepFactory
+from .... import StepFactory
 
 
 @StepFactory.register()

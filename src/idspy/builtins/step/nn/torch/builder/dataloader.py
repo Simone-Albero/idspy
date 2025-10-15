@@ -3,7 +3,7 @@ from typing import Optional, Callable, Any, Dict
 from torch.utils.data import Dataset, DataLoader
 
 from ......core.step.base import Step
-from ....factory import StepFactory
+from .... import StepFactory
 from ......data.torch.batch import default_collate
 
 

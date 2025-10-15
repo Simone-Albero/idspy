@@ -16,9 +16,6 @@ from src.idspy.core.pipeline.observable import (
 )
 from src.idspy.core.events.bus import EventBus
 
-from src.idspy.data.schema import Schema, ColumnRole
-from src.idspy.data.tab_accessor import TabAccessor
-
 from src.idspy.nn.torch.helper import get_device
 from src.idspy.nn.torch.model.classifier import TabularClassifier
 from src.idspy.nn.torch.loss.classification import ClassificationLoss
@@ -35,8 +32,7 @@ def main(cfg: DictConfig):
     set_seeds(cfg.seed)
 
     # Log available steps
-    logger.info(f"Registered {len(StepFactory.get_available_steps())} steps")
-    logger.debug(f"Available steps: {StepFactory.get_available_steps()}")
+    logger.info(f"Registered {len(StepFactory.get_available())} steps")
 
     # Setup device
     if cfg.device == "auto":

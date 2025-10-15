@@ -3,7 +3,7 @@ import logging
 
 from ......core.step.base import Step
 from ......nn.torch.model.base import BaseModel
-from ....factory import StepFactory
+from .... import StepFactory
 
 logger = logging.getLogger(__name__)
 

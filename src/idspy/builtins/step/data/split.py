@@ -4,7 +4,7 @@ import pandas as pd
 
 from ....core.step.base import Step
 from ....data.partition import random_split, stratified_split
-from ..factory import StepFactory
+from .. import StepFactory
 
 
 @StepFactory.register()

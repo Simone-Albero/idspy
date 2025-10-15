@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 from pyclustertend import hopkins as hopkins_score
 
 from .....core.step.base import Step
-from ...factory import StepFactory
+from ... import StepFactory
 
 
 @StepFactory.register()

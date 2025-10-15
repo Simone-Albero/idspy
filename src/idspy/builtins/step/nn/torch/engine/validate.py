@@ -8,7 +8,7 @@ from ......nn.torch.model.base import BaseModel, ModelOutput
 from ......nn.torch.loss.base import BaseLoss
 from ......nn.torch.engine.loops import eval_epoch
 from ......nn.torch.engine.forward import forward_pass, make_predictions
-from ....factory import StepFactory
+from .... import StepFactory
 
 
 @StepFactory.register()

@@ -5,7 +5,7 @@ from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 
 from .....core.step.base import Step
-from ...factory import StepFactory
+from ... import StepFactory
 
 
 @StepFactory.register()

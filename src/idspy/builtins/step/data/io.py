@@ -6,7 +6,7 @@ import pandas as pd
 from ....core.step.base import Step
 from ....data.repository import DataFrameRepository
 from ....data.schema import ColumnRole, Schema
-from ..factory import StepFactory
+from .. import StepFactory
 
 
 @StepFactory.register()

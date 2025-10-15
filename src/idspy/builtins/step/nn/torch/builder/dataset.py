@@ -8,7 +8,7 @@ from ......data.torch.dataset import (
     NumericalTensorDataset,
     MixedTabularDataset,
 )
-from ....factory import StepFactory
+from .... import StepFactory
 
 
 @StepFactory.register()

@@ -5,7 +5,7 @@ import pandas as pd
 
 from ....core.step.base import Step
 from ....core.step.fittable import FittableStep
-from ..factory import StepFactory
+from .. import StepFactory
 
 
 @StepFactory.register()

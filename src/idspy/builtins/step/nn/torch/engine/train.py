@@ -6,7 +6,7 @@ from ......core.step.base import Step
 from ......nn.torch.model.base import BaseModel
 from ......nn.torch.loss.base import BaseLoss
 from ......nn.torch.engine.loops import train_epoch
-from ....factory import StepFactory
+from .... import StepFactory
 
 
 @StepFactory.register()

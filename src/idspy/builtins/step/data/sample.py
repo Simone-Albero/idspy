@@ -4,7 +4,7 @@ import pandas as pd
 
 from ....core.step.base import Step
 from ....data.tab_accessor import reattach_meta
-from ..factory import StepFactory
+from .. import StepFactory
 
 
 @StepFactory.register()

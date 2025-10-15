@@ -4,7 +4,7 @@ import torch
 
 from ......nn.torch.model.base import ModelOutput
 from ......core.step.base import Step
-from ....factory import StepFactory
+from .... import StepFactory
 
 
 @StepFactory.register()
