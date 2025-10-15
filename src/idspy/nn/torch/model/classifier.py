@@ -7,8 +7,10 @@ from .base import BaseModel, ModelOutput
 from ..module.mlp import MLPBlock
 from ..module.embedding import EmbeddingBlock
 from ....data.torch.batch import Features
+from . import ModelFactory
 
 
+@ModelFactory.register()
 class MLPClassifier(BaseModel):
     """Two-stage MLP classifier with feature extraction and classification head."""
 
@@ -56,22 +58,26 @@ class MLPClassifier(BaseModel):
         return ModelOutput(logits=logits, latents=latents)
 
 
+@ModelFactory.register()
 class TabularClassifier(MLPClassifier):
     """Classifier for mixed tabular data (numerical + categorical features)."""
 
     def __init__(
         self,
         num_numeric: int,
-        cat_cardinalities: Sequence[int],
         out_features: int,
+        num_categorical: Optional[int] = None,
+        cat_cardinalities: Optional[Sequence[int]] = None,
+        max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
         activation: Callable[[], nn.Module] = nn.ReLU,
         norm_layer: Optional[Callable[[int], nn.Module]] = None,
-        emb_dim: Optional[int] = None,
         bias: bool = True,
     ) -> None:
-        embedding = EmbeddingBlock(list(cat_cardinalities), emb_dim=emb_dim)
+        embedding = EmbeddingBlock(
+            num_categorical, cat_cardinalities, max_emb_dim=max_emb_dim
+        )
         emb_dim_total = sum(embedding.embedding_dims)
 
         in_features = num_numeric + emb_dim_total

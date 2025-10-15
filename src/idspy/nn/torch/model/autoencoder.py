@@ -7,8 +7,10 @@ from .base import BaseModel, ModelOutput
 from ..module.encoder import NumericEncoder, CategoricalEncoder, TabularEncoder
 from ..module.decoder import NumericDecoder, CategoricalDecoder, TabularDecoder
 from ....data.torch.batch import Features
+from . import ModelFactory
 
 
+@ModelFactory.register()
 class Autoencoder(BaseModel):
 
     def __init__(self, encoder: nn.Module, decoder: nn.Module) -> None:
@@ -83,12 +85,15 @@ class NumericAutoencoder(Autoencoder):
         super().__init__(encoder, decoder)
 
 
+@ModelFactory.register()
 class CategoricalAutoencoder(Autoencoder):
     def __init__(
         self,
-        cat_cardinalities: Sequence[int],
         embed_dim: int,
         latent_dim: int,
+        num_categorical: Optional[int] = None,
+        cat_cardinalities: Optional[Sequence[int]] = None,
+        max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
         activation: Callable[[], nn.Module] = nn.ReLU,
@@ -98,7 +103,9 @@ class CategoricalAutoencoder(Autoencoder):
         hidden_dims = list(hidden_dims)
 
         encoder = CategoricalEncoder(
+            num_categorical=num_categorical,
             cat_cardinalities=cat_cardinalities,
+            max_emb_dim=max_emb_dim,
             embed_dim=embed_dim,
             out_features=latent_dim,
             hidden_dims=hidden_dims,
@@ -109,8 +116,10 @@ class CategoricalAutoencoder(Autoencoder):
         )
 
         decoder = CategoricalDecoder(
-            in_features=latent_dim,
+            num_categorical=num_categorical,
             cat_cardinalities=cat_cardinalities,
+            max_emb_dim=max_emb_dim,
+            in_features=latent_dim,
             hidden_dims=hidden_dims[::-1],
             dropout=dropout,
             activation=activation,
@@ -121,14 +130,16 @@ class CategoricalAutoencoder(Autoencoder):
         super().__init__(encoder, decoder)
 
 
+@ModelFactory.register()
 class TabularAutoencoder(Autoencoder):
 
     def __init__(
         self,
         num_numeric: int,
-        cat_cardinalities: Sequence[int],
-        embed_dim: int,
         latent_dim: int,
+        num_categorical: Optional[int] = None,
+        cat_cardinalities: Optional[Sequence[int]] = None,
+        max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
         activation: Callable[[], nn.Module] = nn.ReLU,
@@ -139,8 +150,9 @@ class TabularAutoencoder(Autoencoder):
 
         encoder = TabularEncoder(
             num_numeric=num_numeric,
+            num_categorical=num_categorical,
             cat_cardinalities=cat_cardinalities,
-            embed_dim=embed_dim,
+            max_emb_dim=max_emb_dim,
             out_features=latent_dim,
             hidden_dims=hidden_dims,
             dropout=dropout,
@@ -151,7 +163,9 @@ class TabularAutoencoder(Autoencoder):
 
         decoder = TabularDecoder(
             num_numeric=num_numeric,
+            num_categorical=num_categorical,
             cat_cardinalities=cat_cardinalities,
+            max_emb_dim=max_emb_dim,
             in_features=latent_dim,
             hidden_dims=hidden_dims[::-1],
             dropout=dropout,

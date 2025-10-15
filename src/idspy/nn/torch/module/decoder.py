@@ -51,7 +51,9 @@ class CategoricalDecoder(nn.Module):
     def __init__(
         self,
         in_features: int,
-        cat_cardinalities: Sequence[int],
+        num_categorical: Optional[int] = None,
+        cat_cardinalities: Optional[Sequence[int]] = None,
+        max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
         activation: Callable[[], nn.Module] = nn.ReLU,
@@ -59,8 +61,13 @@ class CategoricalDecoder(nn.Module):
         bias: bool = True,
     ) -> None:
         super().__init__()
+        if num_categorical is None and cat_cardinalities is None:
+            raise ValueError(
+                "Either num_categorical or cat_cardinalities must be provided."
+            )
+
+        self.cat_cardinalities = cat_cardinalities or [max_emb_dim] * num_categorical
         hidden_dims = list(hidden_dims)
-        self.cat_cardinalities = cat_cardinalities
 
         # Common decoder trunk
         if hidden_dims:
@@ -82,7 +89,7 @@ class CategoricalDecoder(nn.Module):
         self.cat_heads = nn.ModuleList(
             [
                 nn.Linear(trunk_out_features, cardinality)
-                for cardinality in cat_cardinalities
+                for cardinality in self.cat_cardinalities
             ]
         )
 
@@ -111,7 +118,9 @@ class TabularDecoder(nn.Module):
         self,
         in_features: int,
         num_numeric: int,
-        cat_cardinalities: Sequence[int],
+        num_categorical: Optional[int] = None,
+        cat_cardinalities: Optional[Sequence[int]] = None,
+        max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
         activation: Callable[[], nn.Module] = nn.ReLU,
@@ -119,14 +128,14 @@ class TabularDecoder(nn.Module):
         bias: bool = True,
     ) -> None:
         super().__init__()
+        self.num_numeric = num_numeric
 
-        if num_numeric <= 0 or len(cat_cardinalities) <= 0:
+        if num_categorical is None and cat_cardinalities is None:
             raise ValueError(
-                "Both num_numeric and cat_cardinalities must be > 0 for TabularDecoder"
+                "Either num_categorical or cat_cardinalities must be provided."
             )
 
-        self.num_numeric = num_numeric
-        self.cat_cardinalities = cat_cardinalities
+        self.cat_cardinalities = cat_cardinalities or [max_emb_dim] * num_categorical
         hidden_dims = list(hidden_dims)
 
         # Common decoder trunk
@@ -152,7 +161,7 @@ class TabularDecoder(nn.Module):
         self.cat_heads = nn.ModuleList(
             [
                 nn.Linear(trunk_out_features, cardinality)
-                for cardinality in cat_cardinalities
+                for cardinality in self.cat_cardinalities
             ]
         )
 

@@ -50,9 +50,10 @@ class CategoricalEncoder(nn.Module):
 
     def __init__(
         self,
-        cat_cardinalities: Sequence[int],
-        embed_dim: int,
         out_features: int,
+        num_categorical: Optional[int] = None,
+        cat_cardinalities: Optional[Sequence[int]] = None,
+        max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
         activation: Callable[[], nn.Module] = nn.ReLU,
@@ -63,14 +64,13 @@ class CategoricalEncoder(nn.Module):
         hidden_dims = list(hidden_dims)
 
         self.embedding = EmbeddingBlock(
-            cat_cardinalities=cat_cardinalities,
-            embed_dim=embed_dim,
-            dropout=dropout,
+            num_categorical, cat_cardinalities, max_emb_dim=max_emb_dim
         )
 
-        in_features = embed_dim * len(cat_cardinalities)
+        embed_features = sum(self.embedding.get_embedding_dims())
+
         self.encoder = MLPBlock(
-            in_features=in_features,
+            in_features=embed_features,
             out_features=out_features,
             hidden_dims=hidden_dims,
             activation=activation,
@@ -99,9 +99,10 @@ class TabularEncoder(nn.Module):
     def __init__(
         self,
         num_numeric: int,
-        cat_cardinalities: Sequence[int],
-        embed_dim: int,
         out_features: int,
+        num_categorical: Optional[int] = None,
+        cat_cardinalities: Optional[Sequence[int]] = None,
+        max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
         activation: Callable[[], nn.Module] = nn.ReLU,
@@ -119,12 +120,10 @@ class TabularEncoder(nn.Module):
         self.cat_cardinalities = cat_cardinalities
 
         self.embedding = EmbeddingBlock(
-            cat_cardinalities=cat_cardinalities,
-            embed_dim=embed_dim,
-            dropout=dropout,
+            num_categorical, cat_cardinalities, max_emb_dim=max_emb_dim
         )
 
-        embed_features = embed_dim * len(cat_cardinalities)
+        embed_features = sum(self.embedding.get_embedding_dims())
         total_features = num_numeric + embed_features
 
         self.encoder = MLPBlock(
