@@ -10,7 +10,7 @@ defaults:
 # Global settings
 seed: 42
 device: auto  # auto, cpu, cuda, mps
-max_frequency_levels: 20
+max_cat_levels: 32
 
 hydra:
   run:

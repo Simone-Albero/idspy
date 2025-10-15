@@ -48,3 +48,6 @@ categorical_columns:
   - ICMP_IPV4_TYPE
   - DNS_QUERY_ID
   - DNS_QUERY_TYPE
+
+num_numeric: 29
+num_categorical: 11

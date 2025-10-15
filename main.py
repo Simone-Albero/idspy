@@ -43,8 +43,7 @@ def main(cfg: DictConfig):
     # Setup model
     model = TabularClassifier(
         num_numeric=len(cfg.data.numerical_columns),
-        cat_cardinalities=[cfg.max_frequency_levels]
-        * len(cfg.data.categorical_columns),
+        cat_cardinalities=[cfg.max_cat_levels] * len(cfg.data.categorical_columns),
         out_features=cfg.model.out_features,
         hidden_dims=cfg.model.hidden_dims,
         dropout=cfg.model.dropout,
@@ -57,7 +56,6 @@ def main(cfg: DictConfig):
     storage = DictStorage(
         {
             "device": device,
-            "model": model,
             "loss_fn": loss,
             "optimizer": optimizer,
             "seed": cfg.seed,
@@ -108,8 +106,8 @@ def main(cfg: DictConfig):
     )
 
     # Run pipelines
-    logger.info("Running preprocessing pipeline...")
-    preprocessing_pipeline.run()
+    # logger.info("Running preprocessing pipeline...")
+    # preprocessing_pipeline.run()
 
     logger.info("Running training pipeline...")
     training_pipeline.run()

@@ -19,7 +19,7 @@ preprocessing:
     - _target_: standard_scale
 
     - _target_: frequency_map
-      max_levels: ${max_frequency_levels}
+      max_levels: ${max_cat_levels}
 
     - _target_: label_map
 
@@ -46,6 +46,10 @@ training:
       targets_key: test.targets
 
     # Build training dataset and dataloader
+    - _target_: build_model
+      model_config: ${model}
+      model_key: model
+
     - _target_: build_dataset
       df_key: train.data
       dataset_key: train.dataset
@@ -80,7 +84,7 @@ training:
 
     - _target_: save_model_weights
       file_path: ${path.models}
-      file_name: ${model.name}
+      file_name: ${model._target_}
       fmt: pt
 
     # Validation step
