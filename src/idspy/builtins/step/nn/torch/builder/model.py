@@ -1,5 +1,7 @@
 from typing import Optional, Any, Dict
 
+from idspy.nn import torch
+
 from ......core.step.base import Step
 
 from .... import StepFactory
@@ -7,6 +9,7 @@ from ......nn.torch.model import ModelFactory
 
 
 @StepFactory.register()
+@Step.needs("device")
 class BuildModel(Step):
     """build a BaseModel instance from config and Model name."""
 
@@ -26,6 +29,6 @@ class BuildModel(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def compute(self) -> Optional[Dict[str, Any]]:
-        model = ModelFactory.create(self.model_config)
+    def compute(self, device: torch.device) -> Optional[Dict[str, Any]]:
+        model = ModelFactory.create(self.model_config).to(device)
         return {"model": model}

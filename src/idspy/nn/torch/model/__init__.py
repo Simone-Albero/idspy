@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from ....core.factory import Factory, discover_and_import_modules
-from ....core.step.base import Step
 from .base import BaseModel
 
 ModelFactory = Factory[BaseModel](component_type_name="model")

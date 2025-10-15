@@ -5,8 +5,10 @@ import torch
 import torch.nn.functional as F
 
 from .base import BaseLoss
+from . import LossFactory
 
 
+@LossFactory.register()
 class NumericReconstructionLoss(BaseLoss):
     """Loss for reconstructing numerical features."""
 
@@ -39,6 +41,7 @@ class NumericReconstructionLoss(BaseLoss):
         return self._reduce(loss)
 
 
+@LossFactory.register()
 class CategoricalReconstructionLoss(BaseLoss):
     """Loss for reconstructing categorical features."""
 
@@ -99,6 +102,7 @@ class CategoricalReconstructionLoss(BaseLoss):
         return self._reduce(loss)
 
 
+@LossFactory.register()
 class TabularReconstructionLoss(BaseLoss):
     """Combined loss for reconstructing numeric and categorical features with learnable weighting."""
 
