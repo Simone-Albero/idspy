@@ -1,0 +1,5 @@
+data_raw: resources/data/dataset_v2
+data_processed: resources/data/processed
+models: resources/models
+logs: resources/logs
+checkpoints: resources/checkpoints

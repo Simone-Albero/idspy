@@ -10,8 +10,10 @@ from torch.profiler import (
 
 from ......core.step.base import Step
 from ......core.step.contextual import ContextualStep
+from ....factory import StepFactory
 
 
+@StepFactory.register()
 class TorchProfiler(ContextualStep):
     """Wrap a step inside a torch.profiler profile that writes TensorBoard traces."""
 

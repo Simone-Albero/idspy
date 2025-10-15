@@ -1,0 +1,132 @@
+preprocessing:
+  # Non-fitted preprocessing steps
+  base_steps:
+    - _target_: load_data
+      file_path: ${path.data_raw}
+      file_name: ${data.file_name}
+      fmt: "csv"
+      numerical_cols: ${data.numerical_columns}
+      categorical_cols: ${data.categorical_columns}
+      target_col: ${data.target_column}
+
+    - _target_: drop_nulls
+
+    - _target_: stratified_split
+      class_column: ${data.target_column}
+
+  # Fitted preprocessing steps (require fit/transform)
+  fitted_steps:
+    - _target_: standard_scale
+
+    - _target_: frequency_map
+      max_levels: ${max_frequency_levels}
+
+    - _target_: label_map
+
+  # Save processed data
+  save_steps:
+    - _target_: save_data
+      file_path: ${path.data_processed}
+      file_name: ${data.file_name}
+      fmt: ${data.format}
+
+training:
+  base_steps:
+    # Load processed data
+    - _target_: load_data
+      file_path: ${path.data_processed}
+      file_name: ${data.file_name}
+      fmt: ${data.format}
+
+    # Allocate data partitions
+    - _target_: allocate_split_partitions
+
+    - _target_: allocate_targets
+      df_key: test.data
+      targets_key: test.targets
+
+    # Build training dataset and dataloader
+    - _target_: build_dataset
+      df_key: train.data
+      dataset_key: train.dataset
+
+    - _target_: build_data_loader
+      dataset_key: train.dataset
+      dataloader_key: train.dataloader
+      batch_size: ${loop.train.dataloader.batch_size}
+      num_workers: ${loop.train.dataloader.num_workers}
+      shuffle: ${loop.train.dataloader.shuffle}
+      pin_memory: ${loop.train.dataloader.pin_memory}
+
+    # Build test dataset and dataloader
+    - _target_: build_dataset
+      df_key: test.data
+      dataset_key: test.dataset
+
+    - _target_: build_data_loader
+      dataset_key: test.dataset
+      dataloader_key: test.dataloader
+      batch_size: ${loop.test.dataloader.batch_size}
+      num_workers: ${loop.test.dataloader.num_workers}
+      shuffle: ${loop.test.dataloader.shuffle}
+      pin_memory: ${loop.test.dataloader.pin_memory}
+
+    # Training step
+    - _target_: train_one_epoch
+
+    - _target_: metrics_logger
+      log_dir: ${path.logs}
+      metrics_key: train.metrics
+
+    - _target_: save_model_weights
+      file_path: ${path.models}
+      file_name: ${model.name}
+      fmt: pt
+
+    # Validation step
+    - _target_: validate_one_epoch
+      dataloader_key: test.dataloader
+      metrics_key: test.metrics
+      outputs_key: test.outputs
+      save_outputs: true
+
+    - _target_: early_stopping
+      min_delta: 0.001
+      metrics_key: test.metrics
+      model_key: model
+      stop_key: stop_pipeline
+
+    - _target_: cat_tensors
+      inputs_key: test.outputs
+      input_section: logits
+      outputs_key: test.logits
+
+    - _target_: cat_tensors
+      inputs_key: test.outputs
+      input_section: latents
+      outputs_key: test.latents
+
+    - _target_: make_predictions
+      inputs_key: test.logits
+      outputs_key: test.predictions
+
+    # Calculate classification metrics
+    - _target_: classification_metrics
+      predictions_key: test.predictions
+      targets_key: test.targets
+      metrics_key: test.metrics
+
+    - _target_: metrics_logger
+      log_dir: ${path.logs}
+      metrics_key: test.metrics
+
+    - _target_: weights_logger
+      log_dir: ${path.logs}
+      model_key: model
+
+    # Optional: clustering scores
+    # - _target_: clustering_scores
+    #   vectors_key: test.latents
+    #   targets_key: test.targets
+    #   outputs_key: test.clustering_scores
+    #   scale_inputs: true

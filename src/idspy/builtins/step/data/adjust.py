@@ -5,8 +5,10 @@ import pandas as pd
 
 from ....core.step.base import Step
 from ....data.tab_accessor import reattach_meta
+from ..factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("df")
 class DropNulls(Step):
     """Drop all rows that contain null values, including NaN and ±inf."""
@@ -30,6 +32,7 @@ class DropNulls(Step):
         return {"df": df}
 
 
+@StepFactory.register()
 @Step.needs("df")
 class Filter(Step):
     """Filter rows using a pandas query string."""
@@ -56,6 +59,7 @@ class Filter(Step):
         return {"df": reattach_meta(df, filtered)}
 
 
+@StepFactory.register()
 @Step.needs("df")
 class Log1p(Step):
     """Apply np.log1p to numerical columns."""

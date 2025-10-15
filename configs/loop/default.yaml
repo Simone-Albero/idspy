@@ -1,0 +1,16 @@
+train:
+  epochs: 10
+
+  dataloader:
+    batch_size: 1024
+    num_workers: 8
+    shuffle: true
+    pin_memory: false
+
+test:
+
+  dataloader:
+    batch_size: 2048
+    num_workers: 8
+    shuffle: false
+    pin_memory: false

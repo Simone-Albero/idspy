@@ -5,8 +5,10 @@ import pandas as pd
 
 from ....core.step.base import Step
 from ....core.step.fittable import FittableStep
+from ..factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("df")
 class StandardScale(FittableStep):
     """Standardize numerical columns using mean/std with overflow-safe scaling."""
@@ -30,7 +32,6 @@ class StandardScale(FittableStep):
 
     def fit_impl(self, df: pd.DataFrame) -> None:
         """Fit scaling stats on train split (overflow-safe)."""
-
         numerical_data = df.tab.train.tab.numerical
         if numerical_data.shape[1] == 0:
             self._scale = pd.Series(dtype="float64")
@@ -72,6 +73,7 @@ class StandardScale(FittableStep):
         return {"df": df}
 
 
+@StepFactory.register()
 @Step.needs("df")
 class MinMaxScale(FittableStep):
     """Scale numerical columns to [0, 1] via min/max."""

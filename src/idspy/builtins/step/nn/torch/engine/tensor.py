@@ -4,8 +4,10 @@ import torch
 
 from ......nn.torch.model.base import ModelOutput
 from ......core.step.base import Step
+from ....factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("inputs")
 class CatTensors(Step):
     """Stack model outputs into a single tensor."""

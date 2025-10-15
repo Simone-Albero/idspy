@@ -4,8 +4,10 @@ import numpy as np
 
 from ......core.step.base import Step
 from ......plot.score import confusion_matrix_to_plot, dict_to_bar_plot
+from ....factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("predictions", "targets")
 class ClassificationMetrics(Step):
     """Compute metrics for multiclass classification."""

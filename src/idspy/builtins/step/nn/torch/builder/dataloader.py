@@ -3,8 +3,11 @@ from typing import Optional, Callable, Any, Dict
 from torch.utils.data import Dataset, DataLoader
 
 from ......core.step.base import Step
+from ....factory import StepFactory
+from ......data.torch.batch import default_collate
 
 
+@StepFactory.register()
 @Step.needs("dataset")
 class BuildDataLoader(Step):
     """Build dataloader from dataset in state."""
@@ -17,7 +20,7 @@ class BuildDataLoader(Step):
         pin_memory: bool = False,
         persistent_workers: bool = False,
         drop_last: bool = False,
-        collate_fn: Optional[Callable] = None,
+        collate_fn: Optional[Callable] = default_collate,
         dataset_key: str = "dataset",
         dataloader_key: str = "dataloader",
         name: Optional[str] = None,

@@ -3,10 +3,12 @@ import logging
 
 from ......core.step.base import Step
 from ......nn.torch.model.base import BaseModel
+from ....factory import StepFactory
 
 logger = logging.getLogger(__name__)
 
 
+@StepFactory.register()
 @Step.needs("metrics", "model")
 class EarlyStopping(Step):
     """Early stopping step to monitor a metric and stop training if no improvement is seen."""

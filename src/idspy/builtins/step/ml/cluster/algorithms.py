@@ -5,8 +5,10 @@ from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 
 from .....core.step.base import Step
+from ...factory import StepFactory
 
 
+@StepFactory.register()
 @Step.needs("inputs")
 class KMeans(Step):
     """Compute K-Means clustering on input data."""
@@ -48,6 +50,7 @@ class KMeans(Step):
         return {"outputs": outputs}
 
 
+@StepFactory.register()
 @Step.needs("inputs")
 class GaussianMixture(Step):
     """Compute Gaussian Mixture clustering on input data."""
