@@ -59,6 +59,10 @@ training:
       model_key: model
       optimizer_key: optimizer
 
+    - _target_: build_pred_fn
+      pred_config: ${pred_fn}
+      pred_key: pred_fn
+
     - _target_: build_dataset
       df_key: train.data
       dataset_key: train.dataset

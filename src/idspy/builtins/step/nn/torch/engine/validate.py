@@ -106,28 +106,29 @@ class ForwardOnce(Step):
 
 
 @StepFactory.register()
-@Step.needs("inputs")
+@Step.needs("inputs", "pred_fn")
 class MakePredictions(Step):
     """Make predictions from model outputs."""
 
     def __init__(
         self,
-        pred_fn: Callable = lambda x: torch.argmax(x, dim=1),
         inputs_key: str = "inputs",
+        pred_key: str = "pred_fn",
         outputs_key: str = "outputs",
         name: Optional[str] = None,
     ) -> None:
-        self.pred_fn = pred_fn
-
         super().__init__(name=name or "make_predictions")
         self.key_map = {
             "inputs": inputs_key,
             "outputs": outputs_key,
+            "pred_fn": pred_key,
         }
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def compute(self, inputs: torch.Tensor) -> Optional[Dict[str, Any]]:
-        predictions = make_predictions(inputs, self.pred_fn).detach().cpu().numpy()
+    def compute(
+        self, inputs: torch.Tensor, pred_fn: Callable
+    ) -> Optional[Dict[str, Any]]:
+        predictions = make_predictions(inputs, pred_fn).detach().cpu().numpy()
         return {"outputs": predictions}

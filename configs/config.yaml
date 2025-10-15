@@ -6,6 +6,7 @@ defaults:
   - path: default
   - pipeline: baseline
   - loss: classification
+  - pred_fn: argmax
   - _self_
 
 # Global settings
