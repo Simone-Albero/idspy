@@ -35,7 +35,7 @@ def preprocessing_pipeline(cfg: DictConfig, storage: DictStorage):
     # Collecting steps
     base_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.base_steps)
     fitted_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.fitted_steps)
-    save_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.save_steps)
+    final_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.final_steps)
 
     fit_aware_pipeline = ObservableFittablePipeline(
         steps=fitted_steps,
@@ -44,7 +44,7 @@ def preprocessing_pipeline(cfg: DictConfig, storage: DictStorage):
         storage=storage,
     )
 
-    full_steps = base_steps + [fit_aware_pipeline] + save_steps
+    full_steps = base_steps + [fit_aware_pipeline] + final_steps
 
     preprocessing_pipeline = ObservablePipeline(
         steps=full_steps,
@@ -65,6 +65,7 @@ def training_pipeline(cfg: DictConfig, storage: DictStorage):
 
     setup_steps = StepFactory.create_from_list(cfg.pipeline.training.setup_steps)
     training_steps = StepFactory.create_from_list(cfg.pipeline.training.base_steps)
+    final_steps = StepFactory.create_from_list(cfg.pipeline.training.final_steps)
 
     training_pipeline = ObservableRepeatablePipeline(
         steps=training_steps,
@@ -76,7 +77,7 @@ def training_pipeline(cfg: DictConfig, storage: DictStorage):
         storage=storage,
     )
 
-    full_steps = setup_steps + [training_pipeline]
+    full_steps = setup_steps + [training_pipeline] + final_steps
     full_pipeline = ObservablePipeline(
         steps=full_steps,
         storage=storage,
@@ -85,6 +86,27 @@ def training_pipeline(cfg: DictConfig, storage: DictStorage):
     )
 
     logger.info("Running training pipeline...")
+    full_pipeline.run()
+
+
+def testing_pipeline(cfg: DictConfig, storage: DictStorage):
+    bus = EventBus()
+    bus.subscribe(callback=Logger(), event_type=PipelineEvent.STEP_START)
+
+    logger.info("Building testing pipeline from config...")
+
+    setup_steps = StepFactory.create_from_list(cfg.pipeline.testing.setup_steps)
+    testing_steps = StepFactory.create_from_list(cfg.pipeline.testing.base_steps)
+
+    full_steps = setup_steps + testing_steps
+    full_pipeline = ObservablePipeline(
+        steps=full_steps,
+        storage=storage,
+        bus=bus,
+        name="full_pipeline",
+    )
+
+    logger.info("Running testing pipeline...")
     full_pipeline.run()
 
 
@@ -113,6 +135,8 @@ def main(cfg: DictConfig):
         preprocessing_pipeline(cfg, storage)
     elif cfg.stage == "training":
         training_pipeline(cfg, storage)
+    elif cfg.stage == "testing":
+        testing_pipeline(cfg, storage)
 
 
 if __name__ == "__main__":

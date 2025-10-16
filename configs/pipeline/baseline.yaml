@@ -1,5 +1,5 @@
 preprocessing:
-  # Non-fitted preprocessing steps
+  # Non-fitted steps
   base_steps:
     - _target_: load_data
       file_path: ${path.data_raw}
@@ -14,7 +14,7 @@ preprocessing:
     - _target_: stratified_split
       class_column: ${data.target_column}
 
-  # Fitted preprocessing steps (require fit/transform)
+  # Fitted steps (require fit/transform)
   fitted_steps:
     - _target_: standard_scale
 
@@ -23,14 +23,15 @@ preprocessing:
 
     - _target_: label_map
 
-  # Save processed data
-  save_steps:
+
+  final_steps:
     - _target_: save_data
       file_path: ${path.data_processed}
       file_name: ${data.file_name}
       fmt: ${data.format}
 
 training:
+  # Setup training environment
   setup_steps:
     - _target_: load_data
       file_path: ${path.data_processed}
@@ -38,10 +39,6 @@ training:
       fmt: ${data.format}
 
     - _target_: allocate_split_partitions
-
-    - _target_: allocate_targets
-      df_key: test.data
-      targets_key: test.targets
 
     - _target_: build_model
       model_config: ${model}
@@ -61,10 +58,6 @@ training:
       optimizer_key: optimizer
       scheduler_key: scheduler
 
-    - _target_: build_pred_fn
-      pred_config: ${pred_fn}
-      pred_key: pred_fn
-
     - _target_: build_dataset
       df_key: train.data
       dataset_key: train.dataset
@@ -78,6 +71,72 @@ training:
       pin_memory: ${loop.train.dataloader.pin_memory}
 
     - _target_: build_dataset
+      df_key: val.data
+      dataset_key: val.dataset
+
+    - _target_: build_data_loader
+      dataset_key: val.dataset
+      dataloader_key: val.dataloader
+      batch_size: ${loop.val.dataloader.batch_size}
+      num_workers: ${loop.val.dataloader.num_workers}
+      shuffle: ${loop.val.dataloader.shuffle}
+      pin_memory: ${loop.val.dataloader.pin_memory}
+
+  # Main training loop
+  base_steps:
+    # Training step
+    - _target_: train_one_epoch
+      metrics_key: train.metrics
+
+    - _target_: metrics_logger
+      log_dir: ${path.logs}
+      metrics_key: train.metrics
+
+    # Validation step
+    - _target_: validate_one_epoch
+      dataloader_key: val.dataloader
+      metrics_key: val.metrics
+      outputs_key: val.outputs
+      save_outputs: false
+
+    - _target_: early_stopping
+      min_delta: 0.001
+      metrics_key: val.metrics
+      model_key: model
+      stop_key: stop_pipeline
+
+  final_steps:
+    - _target_: save_model_weights
+      file_path: ${path.models}
+      file_name: ${model._target_}_final
+      fmt: pt
+
+
+testing:
+  # Setup testing environment
+  setup_steps:
+    - _target_: load_data
+      file_path: ${path.data_processed}
+      file_name: ${data.file_name}
+      fmt: ${data.format}
+
+    - _target_: allocate_split_partitions
+
+    - _target_: allocate_targets
+      df_key: test.data
+      targets_key: test.targets
+
+    - _target_: load_model_weights
+      file_path: ${path.models}
+      file_name: ${model._target_}_final
+      fmt: pt
+      model_key: model
+
+    - _target_: build_pred_fn
+      pred_config: ${pred_fn}
+      pred_key: pred_fn
+
+    - _target_: build_dataset
       df_key: test.data
       dataset_key: test.dataset
 
@@ -89,32 +148,13 @@ training:
       shuffle: ${loop.test.dataloader.shuffle}
       pin_memory: ${loop.test.dataloader.pin_memory}
 
-
+  # Main testing loop
   base_steps:
-    # Training step
-    - _target_: train_one_epoch
-
-    - _target_: metrics_logger
-      log_dir: ${path.logs}
-      metrics_key: train.metrics
-
-    - _target_: save_model_weights
-      file_path: ${path.models}
-      file_name: ${model._target_}
-      fmt: pt
-
-    # Validation step
     - _target_: validate_one_epoch
       dataloader_key: test.dataloader
       metrics_key: test.metrics
       outputs_key: test.outputs
       save_outputs: true
-
-    - _target_: early_stopping
-      min_delta: 0.001
-      metrics_key: test.metrics
-      model_key: model
-      stop_key: stop_pipeline
 
     - _target_: cat_tensors
       inputs_key: test.outputs
@@ -130,7 +170,6 @@ training:
       inputs_key: test.logits
       outputs_key: test.predictions
 
-    # Calculate classification metrics
     - _target_: classification_metrics
       predictions_key: test.predictions
       targets_key: test.targets
@@ -143,10 +182,3 @@ training:
     - _target_: weights_logger
       log_dir: ${path.logs}
       model_key: model
-
-    # Optional: clustering scores
-    # - _target_: clustering_scores
-    #   vectors_key: test.latents
-    #   targets_key: test.targets
-    #   outputs_key: test.clustering_scores
-    #   scale_inputs: true
