@@ -1,4 +1,5 @@
 import logging
+import sys
 
 import torch
 from omegaconf import DictConfig
@@ -15,10 +16,11 @@ from src.idspy.core.pipeline.observable import (
     ObservableRepeatablePipeline,
 )
 from src.idspy.core.events.bus import EventBus
+from src.idspy.core.events.event import only_source
 
 from src.idspy.nn.torch.helper import get_device
 
-from src.idspy.builtins.handler.logging import Logger
+from src.idspy.builtins.handler.logging import Logger, DataFrameProfiler
 
 from src.idspy.builtins.step import StepFactory
 
@@ -29,6 +31,11 @@ logger = logging.getLogger(__name__)
 def preprocessing_pipeline(cfg: DictConfig, storage: DictStorage):
     bus = EventBus()
     bus.subscribe(callback=Logger(), event_type=PipelineEvent.STEP_START)
+    bus.subscribe(
+        callback=DataFrameProfiler(),
+        event_type=PipelineEvent.PIPELINE_END,
+        predicate=only_source("preprocessing_pipeline"),
+    )
 
     logger.info("Building preprocessing pipeline from config...")
 
@@ -36,6 +43,9 @@ def preprocessing_pipeline(cfg: DictConfig, storage: DictStorage):
     base_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.base_steps)
     fitted_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.fitted_steps)
     final_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.final_steps)
+    logger.info(
+        f"Preprocessing steps: base={len(base_steps)}, fitted={len(fitted_steps)}, final={len(final_steps)}"
+    )
 
     fit_aware_pipeline = ObservableFittablePipeline(
         steps=fitted_steps,
@@ -66,6 +76,9 @@ def training_pipeline(cfg: DictConfig, storage: DictStorage):
     setup_steps = StepFactory.create_from_list(cfg.pipeline.training.setup_steps)
     training_steps = StepFactory.create_from_list(cfg.pipeline.training.base_steps)
     final_steps = StepFactory.create_from_list(cfg.pipeline.training.final_steps)
+    logger.info(
+        f"Training steps: setup={len(setup_steps)}, training={len(training_steps)}, final={len(final_steps)}"
+    )
 
     training_pipeline = ObservableRepeatablePipeline(
         steps=training_steps,
@@ -98,6 +111,10 @@ def testing_pipeline(cfg: DictConfig, storage: DictStorage):
     setup_steps = StepFactory.create_from_list(cfg.pipeline.testing.setup_steps)
     testing_steps = StepFactory.create_from_list(cfg.pipeline.testing.base_steps)
 
+    logger.info(
+        f"Testing steps: setup={len(setup_steps)}, testing={len(testing_steps)}"
+    )
+
     full_steps = setup_steps + testing_steps
     full_pipeline = ObservablePipeline(
         steps=full_steps,
@@ -112,9 +129,6 @@ def testing_pipeline(cfg: DictConfig, storage: DictStorage):
 
 def main(cfg: DictConfig):
     set_seeds(cfg.seed)
-
-    # Log available steps
-    logger.info(f"Registered {len(StepFactory.get_available())} steps")
 
     # Setup device
     if cfg.device == "auto":
@@ -140,5 +154,7 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    cfg = load_config(config_path="configs", config_name="config")
+    cfg = load_config(
+        config_path="configs", config_name="config", overrides=sys.argv[1:]
+    )
     main(cfg)

@@ -51,3 +51,7 @@ categorical_columns:
 
 num_numeric: 29
 num_categorical: 11
+
+train_size: 0.85
+val_size: 0.1
+test_size: 0.05

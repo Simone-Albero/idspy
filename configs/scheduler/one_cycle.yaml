@@ -5,5 +5,5 @@ _params_:
   pct_start: 0.15
   anneal_strategy: cos
   epochs: ${loop.train.epochs}
-  steps_per_epoch: 10000
+  steps_per_epoch: auto
 

@@ -11,8 +11,15 @@ preprocessing:
 
     - _target_: drop_nulls
 
+    - _target_: rare_class_filter
+      target_col: ${data.target_column}
+      min_count: 3000
+
     - _target_: stratified_split
       class_column: ${data.target_column}
+      train_size: ${data.train_size}
+      val_size: ${data.val_size}
+      test_size: ${data.test_size}
 
   # Fitted steps (require fit/transform)
   fitted_steps:
@@ -53,11 +60,6 @@ training:
       model_key: model
       optimizer_key: optimizer
 
-    - _target_: build_scheduler
-      scheduler_config: ${scheduler}
-      optimizer_key: optimizer
-      scheduler_key: scheduler
-
     - _target_: build_dataset
       df_key: train.data
       dataset_key: train.dataset
@@ -69,6 +71,12 @@ training:
       num_workers: ${loop.train.dataloader.num_workers}
       shuffle: ${loop.train.dataloader.shuffle}
       pin_memory: ${loop.train.dataloader.pin_memory}
+
+    - _target_: build_scheduler
+      scheduler_config: ${scheduler}
+      optimizer_key: optimizer
+      scheduler_key: scheduler
+      dataloader_key: train.dataloader
 
     - _target_: build_dataset
       df_key: val.data
@@ -91,6 +99,10 @@ training:
     - _target_: metrics_logger
       log_dir: ${path.logs}
       metrics_key: train.metrics
+
+    - _target_: weights_logger
+      log_dir: ${path.logs}
+      model_key: model
 
     # Validation step
     - _target_: validate_one_epoch
@@ -125,6 +137,10 @@ testing:
     - _target_: allocate_targets
       df_key: test.data
       targets_key: test.targets
+
+    - _target_: build_model
+      model_config: ${model}
+      model_key: model
 
     - _target_: load_model_weights
       file_path: ${path.models}
@@ -178,7 +194,3 @@ testing:
     - _target_: metrics_logger
       log_dir: ${path.logs}
       metrics_key: test.metrics
-
-    - _target_: weights_logger
-      log_dir: ${path.logs}
-      model_key: model
