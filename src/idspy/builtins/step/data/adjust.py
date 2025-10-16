@@ -61,6 +61,37 @@ class Filter(Step):
 
 @StepFactory.register()
 @Step.needs("df")
+class RareClassFilter(Step):
+    """Filter out rare classes from a categorical column."""
+
+    def __init__(
+        self,
+        target_col: str,
+        min_count: int = 100,
+        df_key: str = "data.base_df",
+        name: Optional[str] = None,
+    ) -> None:
+        self.target_col = target_col
+        self.min_count = min_count
+
+        super().__init__(name=name or "rare_class_filter")
+
+        self.key_map = {
+            "df": df_key,
+        }
+
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        value_counts = df[self.target_col].value_counts()
+        to_keep = value_counts[value_counts >= self.min_count].index
+        filtered = df[df[self.target_col].isin(to_keep)]
+        return {"df": reattach_meta(df, filtered)}
+
+
+@StepFactory.register()
+@Step.needs("df")
 class Log1p(Step):
     """Apply np.log1p to numerical columns."""
 
