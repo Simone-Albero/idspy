@@ -59,6 +59,11 @@ training:
       model_key: model
       optimizer_key: optimizer
 
+    - _target_: build_scheduler
+      scheduler_config: ${scheduler}
+      optimizer_key: optimizer
+      scheduler_key: scheduler
+
     - _target_: build_pred_fn
       pred_config: ${pred_fn}
       pred_key: pred_fn

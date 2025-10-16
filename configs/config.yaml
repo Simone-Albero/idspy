@@ -3,6 +3,7 @@ defaults:
   - data: cic_2018_v2
   - loop: default
   - optimizer: adamw
+  - scheduler: one_cycle
   - path: default
   - pipeline: baseline
   - loss: classification

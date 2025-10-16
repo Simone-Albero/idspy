@@ -67,6 +67,7 @@ def train_epoch(
     loss_fn: BaseLoss,
     clip_grad_max_norm: Optional[float] = 1.0,
     profiler: Optional[torch.profiler.profile] = None,
+    scheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None,
 ) -> Tuple[float, Optional[float], Optional[float]]:
     """Training epoch: forward, backward, optimizer step with optional gradient clipping."""
     model.train()
@@ -93,6 +94,9 @@ def train_epoch(
 
         if profiler is not None:
             profiler.step()
+
+        if scheduler is not None:
+            scheduler.step()
 
         pbar.set_postfix({"loss": f"{loss.item():.4f}"})
 
