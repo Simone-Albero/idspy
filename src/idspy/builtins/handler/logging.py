@@ -55,7 +55,7 @@ class Logger(BaseHandler):
             }
             self.logger.log(self.level, json.dumps(rec, default=str))
         else:
-            payload_str = _repr_truncated(event.payload.keys(), self.max_chars)
+            payload_str = _repr_truncated(list(event.payload.keys()), self.max_chars)
             self.logger.log(
                 self.level,
                 "EVENT type=%s source=%s ts=%s | payload=%s",
@@ -128,20 +128,20 @@ class DataFrameProfiler(BaseHandler):
 
     logger: logging.Logger = field(default_factory=lambda: logging.getLogger(__name__))
     level: int = logging.INFO
-    key: str = "data.root"
+    df_key: str = "data.base_df"
     deep_memory: bool = True
     include_index: bool = False
     max_chars: int = 2000
 
     def _pick(self, event: Event) -> Any:
-        return event.payload.get(self.key)
+        return event.payload.get(self.df_key)
 
     def handle(self, event: Event) -> None:
         df = self._pick(event)
         try:
             rows, cols = getattr(df, "shape", (None, None))
             mem = df.memory_usage(index=self.include_index, deep=self.deep_memory).sum()
-            nans = df.isna().sum().sum()
+            nans = df.replace([np.inf, -np.inf], np.nan).isna().sum().sum()
 
             self.logger.log(
                 self.level,
@@ -153,6 +153,13 @@ class DataFrameProfiler(BaseHandler):
                 nans,
                 _repr_truncated(df.dtypes.to_dict(), self.max_chars),
             )
+
+            self.logger.log(
+                self.level,
+                "DATAFRAME target class distribution:\n%s",
+                df.tab.target.value_counts(),
+            )
+
         except Exception:
             self.logger.exception(
                 "DATAFRAME error type=%s source=%s", event.type, event.source

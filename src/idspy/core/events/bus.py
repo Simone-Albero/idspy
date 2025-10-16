@@ -98,5 +98,5 @@ class EventBus:
                     entry.callback(event)
             except Exception:
                 logger.exception(
-                    "Subscriber error for %s (id=%s)", event.type, event.id
+                    "Subscriber error for %s (source=%s)", event.type, event.source
                 )
