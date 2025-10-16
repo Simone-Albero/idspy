@@ -8,7 +8,7 @@ from .... import StepFactory
 
 
 @StepFactory.register()
-@Step.needs("optimizer")
+@Step.needs("optimizer", "dataloader")
 class BuildScheduler(Step):
     """build a learning rate scheduler instance from config and optimizer."""
 
@@ -17,6 +17,7 @@ class BuildScheduler(Step):
         scheduler_config: Dict[str, Any],
         optimizer_key: str = "optimizer",
         scheduler_key: str = "scheduler",
+        dataloader_key: str = "dataloader",
         name: Optional[str] = None,
     ) -> None:
 
@@ -25,14 +26,22 @@ class BuildScheduler(Step):
         self.key_map = {
             "optimizer": optimizer_key,
             "scheduler": scheduler_key,
+            "dataloader": dataloader_key,
         }
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def compute(self, optimizer: torch.optim.Optimizer) -> Optional[Dict[str, Any]]:
+    def compute(
+        self, optimizer: torch.optim.Optimizer, dataloader: torch.utils.data.DataLoader
+    ) -> Optional[Dict[str, Any]]:
         SchedulerClass = getattr(
             torch.optim.lr_scheduler, self.scheduler_config._target_
         )
+
+        if self.scheduler_config._params_.steps_per_epoch == "auto":
+            steps_per_epoch = len(dataloader)
+            self.scheduler_config._params_.steps_per_epoch = steps_per_epoch
+
         scheduler = SchedulerClass(optimizer, **self.scheduler_config._params_)
         return {"scheduler": scheduler}
