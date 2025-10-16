@@ -11,19 +11,31 @@ from .... import StepFactory
 def _auto_detect_prefix(metrics_key: str) -> str:
     """Auto-detect prefix from metrics_key."""
     if "train" in metrics_key.lower():
-        return "train/"
+        return "train"
     elif "val" in metrics_key.lower() or "validation" in metrics_key.lower():
-        return "val/"
+        return "val"
     elif "test" in metrics_key.lower():
-        return "test/"
+        return "test"
     else:
         return ""
+
+
+def _make_tag(separator: str = "/", *args: str) -> str:
+    """Generate writer tag from prefix and key."""
+    return separator.join(filter(None, args))
+
+
+def _to_cpu_flat(x: torch.Tensor) -> torch.Tensor:
+    """Flatten to 1D CPU tensor."""
+    return x.detach().reshape(-1).to("cpu")
 
 
 @StepFactory.register()
 @Step.needs("metrics")
 class MetricsLogger(Step):
     """Log metrics to TensorBoard."""
+
+    SEPARATOR = "/"
 
     def __init__(
         self,
@@ -36,51 +48,41 @@ class MetricsLogger(Step):
         self.log_dir = log_dir
         self.writer = SummaryWriter(log_dir=log_dir)
         self.step = 0
-
         self.prefix = _auto_detect_prefix(metrics_key) if prefix is None else prefix
-
-        self.key_map = {
-            "metrics": metrics_key,
-        }
+        self.key_map = {"metrics": metrics_key}
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
     def _log_scalar(self, name: str, value: Union[int, float], step: int) -> None:
-        """Log scalar value."""
         self.writer.add_scalar(name, value, step)
 
     def _log_figure(self, name: str, figure: plt.Figure, step: int) -> None:
-        """Log matplotlib figure."""
         self.writer.add_figure(name, figure, step)
 
     def _log_metric(self, key: str, value: Any, step: int) -> None:
-        """Log a single metric based on its type."""
-        # Struttura gerarchica: phase/category/metric_name
-        metric_name = f"{self.prefix}/{key}"
+        metric_name = _make_tag(self.SEPARATOR, self.prefix, key)
 
         if isinstance(value, (int, float)):
             self._log_scalar(metric_name, value, step)
 
         elif isinstance(value, (list, tuple)):
             for i, v in enumerate(value):
-                self._log_scalar(f"{metric_name}/item_{i:02d}", v, step)
+                self._log_metric(key, v, step * len(value) + i)
 
         elif isinstance(value, dict):
             for sub_key, sub_value in value.items():
-                self._log_metric(f"{key}/{sub_key}", sub_value, step)
+                self._log_metric(
+                    _make_tag(key, sub_key, self.SEPARATOR), sub_value, step
+                )
 
         elif isinstance(value, plt.Figure):
-            # Le figure vanno in una sezione separata
-            figure_name = f"figures/{self.prefix}/{key}"
-            self._log_figure(figure_name, value, step)
+            self._log_figure(metric_name, value, step)
             plt.close(value)
 
         else:
             try:
-                # I testi vanno in una sezione separata
-                text_name = f"text/{self.prefix}/{key}"
-                self.writer.add_text(text_name, str(value), step)
+                self.writer.add_text(metric_name, str(value), step)
             except Exception:
                 raise ValueError(
                     f"Unsupported metric type for {metric_name}: {type(value)}"
@@ -89,7 +91,6 @@ class MetricsLogger(Step):
     def compute(self, metrics: Dict[str, float]) -> Optional[Dict[str, Any]]:
         for key, value in metrics.items():
             self._log_metric(key, value, self.step)
-
         self.writer.flush()
         self.step += 1
 
@@ -104,14 +105,13 @@ class MetricsLogger(Step):
 @StepFactory.register()
 @Step.needs("model")
 class WeightsLogger(Step):
-    """Log model weights and gradients to TensorBoard with focus on detecting dead/exploding gradients and parameters."""
+    """Log model weights/gradients to TensorBoard."""
 
     def __init__(
         self,
         log_dir: str,
         model_key: str,
         prefix: Optional[str] = None,
-        log_individual_layers: bool = False,
         dead_params_ratio_threshold: float = 1e-6,
         dead_grad_ratio_threshold: float = 1e-8,
         exploding_grad_ratio_threshold: float = 10.0,
@@ -121,174 +121,120 @@ class WeightsLogger(Step):
         self.log_dir = log_dir
         self.writer = SummaryWriter(log_dir=log_dir)
         self.step = 0
-        self.log_individual_layers = log_individual_layers
         self.dead_params_ratio_threshold = dead_params_ratio_threshold
         self.dead_grad_ratio_threshold = dead_grad_ratio_threshold
         self.exploding_grad_ratio_threshold = exploding_grad_ratio_threshold
+        self.prefix = "model" if prefix is None else prefix
+        self.key_map = {"model": model_key}
 
-        self.prefix = "model/" if prefix is None else f"{prefix}/"
+    def __enter__(self):
+        return self
 
-        self.key_map = {
-            "model": model_key,
-        }
+    def __exit__(self, *_):
+        self.close()
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def _get_layer_name(self, param_name: str) -> str:
-        """Extract layer name from parameter name (remove .weight, .bias suffixes)."""
-        # Remove common parameter suffixes
-        for suffix in [
+    @staticmethod
+    def _get_layer_name(param_name: str) -> str:
+        for suffix in (
             ".weight",
             ".bias",
             ".running_mean",
             ".running_var",
             ".num_batches_tracked",
-        ]:
+        ):
             if param_name.endswith(suffix):
                 return param_name[: -len(suffix)]
         return param_name
 
     def _log_layer_stats(self, model: torch.nn.Module, step: int) -> None:
-        """Log essential statistics for detecting dead/exploding gradients and parameters."""
+        layer_stats: Dict[str, Dict[str, Any]] = {}
 
-        # Collect statistics per layer name
-        layer_stats = {}
-
+        # Collect per-layer weights/grads
         for name, param in model.named_parameters():
             if not param.requires_grad:
                 continue
 
             layer_name = self._get_layer_name(name)
+            entry = layer_stats.setdefault(layer_name, {"weights": [], "grads": []})
 
-            # Initialize layer if not exists
-            if layer_name not in layer_stats:
-                layer_stats[layer_name] = {"weights": [], "grads": [], "names": []}
-
-            # Store parameter data
-            layer_stats[layer_name]["weights"].append(param.data)
-            layer_stats[layer_name]["names"].append(name)
-
+            entry["weights"].append(_to_cpu_flat(param.data))
             if param.grad is not None:
-                layer_stats[layer_name]["grads"].append(param.grad)
+                entry["grads"].append(_to_cpu_flat(param.grad))
 
-        # Log aggregated statistics by layer name
+        # Log summaries
         for layer_name, stats in layer_stats.items():
             if not stats["weights"]:
                 continue
 
-            # Clean layer name for logging (replace dots with underscores)
-            clean_layer_name = layer_name.replace(".", "_")
+            clean = layer_name.replace(".", "_")
+            all_w = torch.cat(stats["weights"], dim=0).float()
 
-            # Combine all weights of this layer
-            all_weights = torch.cat([w.flatten() for w in stats["weights"]])
-
-            # Weight statistics for detecting dead parameters
-            weight_mean = all_weights.mean().item()
-            weight_std = all_weights.std().item()
-            weight_abs_mean = all_weights.abs().mean().item()
-            dead_params_ratio = (
-                (all_weights.abs() < self.dead_params_ratio_threshold)
+            weight_stats = {
+                "mean": all_w.mean().item(),
+                "std": all_w.std().item(),
+                "dead_ratio": (all_w.abs() < self.dead_params_ratio_threshold)
                 .float()
                 .mean()
-                .item()
-            )
+                .item(),
+            }
 
-            self.writer.add_scalar(
-                f"{self.prefix}weights/{clean_layer_name}/mean", weight_mean, step
-            )
-            self.writer.add_scalar(
-                f"{self.prefix}weights/{clean_layer_name}/std", weight_std, step
-            )
-            self.writer.add_scalar(
-                f"{self.prefix}weights/{clean_layer_name}/abs_mean",
-                weight_abs_mean,
-                step,
-            )
-            self.writer.add_scalar(
-                f"{self.prefix}weights/{clean_layer_name}/dead_ratio",
-                dead_params_ratio,
-                step,
-            )
+            for stat_name, stat_value in weight_stats.items():
+                metric_name = _make_tag(
+                    self.separator, self.prefix, "weights", clean, stat_name
+                )
+                self.writer.add_scalar(
+                    metric_name,
+                    stat_value,
+                    step,
+                )
 
-            # Single histogram for weight distribution (key for detecting dead parameters)
             self.writer.add_histogram(
-                f"{self.prefix}weights/{clean_layer_name}/distribution",
-                all_weights,
+                _make_tag(
+                    self.separator, self.prefix, "weights", clean, "distribution"
+                ),
+                all_w,
                 step,
             )
 
-            # Gradient statistics for detecting dead/exploding gradients
             if stats["grads"]:
-                all_grads = torch.cat([g.flatten() for g in stats["grads"]])
-
-                grad_mean = all_grads.mean().item()
-                grad_std = all_grads.std().item()
-                grad_abs_mean = all_grads.abs().mean().item()
-                grad_max = all_grads.abs().max().item()
-                dead_grads_ratio = (
-                    (all_grads.abs() < self.dead_grad_ratio_threshold)
+                all_g = torch.cat(stats["grads"], dim=0).float()
+                grad_stats = {
+                    "mean": all_g.mean().item(),
+                    "std": all_g.std().item(),
+                    "max": all_g.abs().max().item(),
+                    "dead_ratio": (all_g.abs() < self.dead_grad_ratio_threshold)
                     .float()
                     .mean()
-                    .item()
-                )
-                exploding_grads_ratio = (
-                    (all_grads.abs() > self.exploding_grad_ratio_threshold)
+                    .item(),
+                    "exploding_ratio": (
+                        all_g.abs() > self.exploding_grad_ratio_threshold
+                    )
                     .float()
                     .mean()
-                    .item()
-                )
+                    .item(),
+                }
 
-                self.writer.add_scalar(
-                    f"{self.prefix}grads/{clean_layer_name}/mean", grad_mean, step
-                )
-                self.writer.add_scalar(
-                    f"{self.prefix}grads/{clean_layer_name}/std", grad_std, step
-                )
-                self.writer.add_scalar(
-                    f"{self.prefix}grads/{clean_layer_name}/abs_mean",
-                    grad_abs_mean,
-                    step,
-                )
-                self.writer.add_scalar(
-                    f"{self.prefix}grads/{clean_layer_name}/max", grad_max, step
-                )
-                self.writer.add_scalar(
-                    f"{self.prefix}grads/{clean_layer_name}/dead_ratio",
-                    dead_grads_ratio,
-                    step,
-                )
-                self.writer.add_scalar(
-                    f"{self.prefix}grads/{clean_layer_name}/exploding_ratio",
-                    exploding_grads_ratio,
-                    step,
-                )
+                for stat_name, stat_value in grad_stats.items():
+                    metric_name = _make_tag(
+                        self.separator, self.prefix, "grads", clean, stat_name
+                    )
 
-                # Single histogram for gradient distribution (key for detecting issues)
-                self.writer.add_histogram(
-                    f"{self.prefix}grads/{clean_layer_name}/distribution",
-                    all_grads,
-                    step,
-                )
-
-            # Individual parameter logging if requested
-            if self.log_individual_layers:
-                for i, (name, weight) in enumerate(
-                    zip(stats["names"], stats["weights"])
-                ):
-                    clean_name = name.replace(".", "_")
                     self.writer.add_scalar(
-                        f"{self.prefix}individual/{clean_name}/abs_mean",
-                        weight.abs().mean().item(),
+                        metric_name,
+                        stat_value,
                         step,
                     )
-                    if i < len(stats["grads"]):
-                        grad = stats["grads"][i]
-                        self.writer.add_scalar(
-                            f"{self.prefix}individual/{clean_name}/grad_abs_mean",
-                            grad.abs().mean().item(),
-                            step,
-                        )
+
+                self.writer.add_histogram(
+                    _make_tag(
+                        self.separator, self.prefix, "grads", clean, "distribution"
+                    ),
+                    all_g,
+                    step,
+                )
 
     def compute(self, model: torch.nn.Module) -> None:
         self._log_layer_stats(model, self.step)
@@ -296,8 +242,16 @@ class WeightsLogger(Step):
         self.step += 1
 
     def close(self) -> None:
-        self.writer.flush()
-        self.writer.close()
+        try:
+            self.writer.flush()
+        finally:
+            try:
+                self.writer.close()
+            except Exception:
+                pass
 
     def __del__(self) -> None:
-        self.close()
+        try:
+            self.close()
+        except Exception:
+            pass
