@@ -26,6 +26,68 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
+def preprocessing_pipeline(cfg: DictConfig, storage: DictStorage):
+    bus = EventBus()
+    bus.subscribe(callback=Logger(), event_type=PipelineEvent.STEP_START)
+
+    logger.info("Building preprocessing pipeline from config...")
+
+    # Collecting steps
+    base_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.base_steps)
+    fitted_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.fitted_steps)
+    save_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.save_steps)
+
+    fit_aware_pipeline = ObservableFittablePipeline(
+        steps=fitted_steps,
+        name="fit_aware_pipeline",
+        bus=bus,
+        storage=storage,
+    )
+
+    full_steps = base_steps + [fit_aware_pipeline] + save_steps
+
+    preprocessing_pipeline = ObservablePipeline(
+        steps=full_steps,
+        storage=storage,
+        bus=bus,
+        name="preprocessing_pipeline",
+    )
+
+    logger.info("Running preprocessing pipeline...")
+    preprocessing_pipeline.run()
+
+
+def training_pipeline(cfg: DictConfig, storage: DictStorage):
+    bus = EventBus()
+    bus.subscribe(callback=Logger(), event_type=PipelineEvent.STEP_START)
+
+    logger.info("Building training pipeline from config...")
+
+    setup_steps = StepFactory.create_from_list(cfg.pipeline.training.setup_steps)
+    training_steps = StepFactory.create_from_list(cfg.pipeline.training.base_steps)
+
+    training_pipeline = ObservableRepeatablePipeline(
+        steps=training_steps,
+        bus=bus,
+        count=cfg.loop.train.epochs,
+        clear_storage=False,
+        predicate=lambda storage: storage.get("stop_pipeline"),
+        name="training_pipeline",
+        storage=storage,
+    )
+
+    full_steps = setup_steps + [training_pipeline]
+    full_pipeline = ObservablePipeline(
+        steps=full_steps,
+        storage=storage,
+        bus=bus,
+        name="full_pipeline",
+    )
+
+    logger.info("Running training pipeline...")
+    full_pipeline.run()
+
+
 def main(cfg: DictConfig):
     set_seeds(cfg.seed)
 
@@ -47,56 +109,10 @@ def main(cfg: DictConfig):
         }
     )
 
-    # Setup event bus
-    bus = EventBus()
-    bus.subscribe(callback=Logger(), event_type=PipelineEvent.STEP_START)
-
-    # Build preprocessing pipeline from config
-    logger.info("Building preprocessing pipeline from config...")
-
-    # Create fitted pipeline
-    fitted_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.fitted_steps)
-    fit_aware_pipeline = ObservableFittablePipeline(
-        steps=fitted_steps,
-        name="fit_aware_pipeline",
-        bus=bus,
-        storage=storage,
-    )
-
-    # Create base preprocessing steps
-    base_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.base_steps)
-    save_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.save_steps)
-
-    # Combine all preprocessing steps
-    preprocessing_pipeline = ObservablePipeline(
-        steps=base_steps + [fit_aware_pipeline] + save_steps,
-        storage=storage,
-        bus=bus,
-        name="preprocessing_pipeline",
-    )
-
-    # Build training pipeline from config
-    logger.info("Building training pipeline from config...")
-    training_steps = StepFactory.create_from_list(cfg.pipeline.training.base_steps)
-
-    training_pipeline = ObservableRepeatablePipeline(
-        steps=training_steps,
-        bus=bus,
-        count=cfg.loop.train.epochs,
-        clear_storage=False,
-        predicate=lambda storage: storage.get("stop_pipeline"),
-        name="training_pipeline",
-        storage=storage,
-    )
-
-    # Run pipelines
-    # logger.info("Running preprocessing pipeline...")
-    # preprocessing_pipeline.run()
-
-    logger.info("Running training pipeline...")
-    training_pipeline.run()
-
-    logger.info("Pipelines completed.\n(-_-) Exiting.")
+    if cfg.stage == "preprocessing":
+        preprocessing_pipeline(cfg, storage)
+    elif cfg.stage == "training":
+        training_pipeline(cfg, storage)
 
 
 if __name__ == "__main__":
