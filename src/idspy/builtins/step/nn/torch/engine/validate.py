@@ -46,8 +46,8 @@ class ValidateOneEpoch(Step):
         self,
         dataloader: torch.utils.data.DataLoader,
         model: BaseModel,
-        loss_fn: BaseLoss,
         device: torch.device,
+        loss_fn: Optional[BaseLoss] = None,
         context: Optional[any] = None,
     ) -> Optional[Dict[str, Any]]:
         average_loss, model_outputs = eval_epoch(
