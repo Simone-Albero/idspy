@@ -4,13 +4,15 @@ defaults:
   - loop: default
   - optimizer: adamw
   - scheduler: one_cycle
-  - path: default
-  - pipeline: baseline
+  - pipeline: supervised_classifier
   - loss: classification
   - pred_fn: argmax
   - _self_
+  - experiment: supervised_classifier
+  - path: default
 
 # Global settings
+experiment_name: supervised_classifier
 seed: 42
 device: auto  # auto, cpu, cuda, mps
 max_cat_levels: 32
