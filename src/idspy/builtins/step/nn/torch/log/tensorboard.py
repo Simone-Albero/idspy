@@ -107,6 +107,8 @@ class MetricsLogger(Step):
 class WeightsLogger(Step):
     """Log model weights/gradients to TensorBoard."""
 
+    SEPARATOR = "/"
+
     def __init__(
         self,
         log_dir: str,
@@ -183,7 +185,7 @@ class WeightsLogger(Step):
 
             for stat_name, stat_value in weight_stats.items():
                 metric_name = _make_tag(
-                    self.separator, self.prefix, "weights", clean, stat_name
+                    self.SEPARATOR, self.prefix, "weights", clean, stat_name
                 )
                 self.writer.add_scalar(
                     metric_name,
@@ -193,7 +195,7 @@ class WeightsLogger(Step):
 
             self.writer.add_histogram(
                 _make_tag(
-                    self.separator, self.prefix, "weights", clean, "distribution"
+                    self.SEPARATOR, self.prefix, "weights", clean, "distribution"
                 ),
                 all_w,
                 step,
@@ -219,7 +221,7 @@ class WeightsLogger(Step):
 
                 for stat_name, stat_value in grad_stats.items():
                     metric_name = _make_tag(
-                        self.separator, self.prefix, "grads", clean, stat_name
+                        self.SEPARATOR, self.prefix, "grads", clean, stat_name
                     )
 
                     self.writer.add_scalar(
@@ -230,7 +232,7 @@ class WeightsLogger(Step):
 
                 self.writer.add_histogram(
                     _make_tag(
-                        self.separator, self.prefix, "grads", clean, "distribution"
+                        self.SEPARATOR, self.prefix, "grads", clean, "distribution"
                     ),
                     all_g,
                     step,
