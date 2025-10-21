@@ -72,16 +72,16 @@ idspy/
    ```
 2. Create a virtual environment.
    ```bash
-   python3 -m venv .venv
+   python3 -m venv venv
    ```
 3. Activate the environment.
    - macOS/Linux
      ```bash
-     source .venv/bin/activate
+     source venv/bin/activate
      ```
    - Windows (PowerShell)
      ```bash
-     .venv\\Scripts\\Activate.ps1
+     venv\\Scripts\\Activate.ps1
      ```
 4. Install dependencies.
    ```bash

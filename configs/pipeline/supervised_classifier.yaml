@@ -191,6 +191,15 @@ testing:
       targets_key: test.targets
       metrics_key: test.metrics
 
+    - _target_: clustering_scores
+      vectors_key: test.latents
+      targets_key: test.targets
+      outputs_key: test.clustering_scores
+
     - _target_: metrics_logger
       log_dir: ${path.logs}
       metrics_key: test.metrics
+
+    - _target_: metrics_logger
+      log_dir: ${path.logs}
+      metrics_key: test.clustering_scores

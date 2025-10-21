@@ -32,7 +32,9 @@ class ClassificationMetrics(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def compute_metrics(self, y_pred: np.ndarray, y_true: np.ndarray) -> Dict[str, Any]:
+    def _compute_metrics(
+        self, y_pred: np.ndarray, y_true: np.ndarray
+    ) -> Dict[str, Any]:
         """Compute classification metrics."""
         from sklearn.metrics import (
             accuracy_score,
@@ -75,6 +77,8 @@ class ClassificationMetrics(Step):
 
         return metrics
 
-    def compute(self, predictions: np.ndarray, targets: np.ndarray) -> None:
-        metrics = self.compute_metrics(predictions, targets)
+    def compute(
+        self, predictions: np.ndarray, targets: np.ndarray
+    ) -> Optional[Dict[str, Any]]:
+        metrics = self._compute_metrics(predictions, targets)
         return {"metrics": metrics}

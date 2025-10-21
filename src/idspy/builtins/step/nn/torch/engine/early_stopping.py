@@ -66,7 +66,7 @@ class EarlyStopping(Step):
             self.num_bad_epochs = 0
             self.best_model = model
         else:
-            logger.info(f"EARLY_STOPPING {self.best_score:.6f} // {avg_loss:.6f}.")
+            logger.info(f"EARLY_STOPPING {self.best_score:.6f} <- {avg_loss:.6f}.")
             logger.info(f"EARLY_STOPPING {self.num_bad_epochs+1}/{self.patience}")
             self.num_bad_epochs += 1
 
