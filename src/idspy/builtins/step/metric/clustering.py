@@ -12,10 +12,10 @@ from sklearn.metrics import (
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.neighbors import NearestNeighbors
 
-from .....core.step.base import Step
-from ... import StepFactory
-from .....plot.score import dict_to_table
-from ...helpers import sample_vectors_and_labels
+from ....core.step.base import Step
+from .. import StepFactory
+from ....plot.score import dict_to_table
+from ..helpers import sample_vectors_and_labels
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,7 @@ def inter_class_separation(X: np.ndarray, labels: np.ndarray) -> float:
 
 @StepFactory.register()
 @Step.needs("vectors", "targets")
-class ClusteringScores(Step):
+class ClusteringMetrics(Step):
     """Compute clustering metrics for latent space clusterability analysis.
 
     Metrics computed:

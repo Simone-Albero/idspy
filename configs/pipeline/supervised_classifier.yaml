@@ -191,7 +191,7 @@ testing:
       targets_key: test.targets
       metrics_key: test.metrics
 
-    - _target_: clustering_scores
+    - _target_: clustering_metrics
       vectors_key: test.latents
       targets_key: test.targets
       outputs_key: test.clustering_scores

@@ -4,8 +4,8 @@ from torch.utils.tensorboard import SummaryWriter
 from matplotlib import pyplot as plt
 import torch
 
-from ......core.step.base import Step
-from .... import StepFactory
+from ....core.step.base import Step
+from .. import StepFactory
 
 
 def _auto_detect_prefix(metrics_key: str) -> str:
