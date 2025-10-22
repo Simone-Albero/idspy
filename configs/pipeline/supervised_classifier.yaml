@@ -196,6 +196,12 @@ testing:
       targets_key: test.targets
       outputs_key: test.clustering_scores
 
+    - _target_: vectors_projection_plot
+      vectors_key: test.latents
+      targets_key: test.targets
+      n_components: 2
+      output_key: test.projection_plots
+
     - _target_: metrics_logger
       log_dir: ${path.logs}
       metrics_key: test.metrics
@@ -203,3 +209,7 @@ testing:
     - _target_: metrics_logger
       log_dir: ${path.logs}
       metrics_key: test.clustering_scores
+
+    - _target_: metrics_logger
+      log_dir: ${path.logs}
+      metrics_key: test.projection_plots
