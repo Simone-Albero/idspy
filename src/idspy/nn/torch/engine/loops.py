@@ -6,7 +6,7 @@ from torch.nn.utils import clip_grad_norm_
 
 from ..model.base import BaseModel, ModelOutput
 from ..loss.base import BaseLoss
-from ....data.torch.batch import Features, Batch, ensure_batch
+from ....data.torch.batch import Batch, ensure_batch
 
 
 def _forward_and_loss(

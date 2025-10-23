@@ -64,7 +64,7 @@ class TabularClassifier(MLPClassifier):
 
     def __init__(
         self,
-        num_numeric: int,
+        num_numerical: int,
         out_features: int,
         num_categorical: Optional[int] = None,
         cat_cardinalities: Optional[Sequence[int]] = None,
@@ -80,7 +80,7 @@ class TabularClassifier(MLPClassifier):
         )
         emb_dim_total = sum(embedding.embedding_dims)
 
-        in_features = num_numeric + emb_dim_total
+        in_features = num_numerical + emb_dim_total
         super().__init__(
             in_features=in_features,
             out_features=out_features,

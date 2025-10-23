@@ -23,7 +23,7 @@ class FrequencyMap(FittableStep):
         cat_mapping_key: str = "data.cat_mapping",
         name: Optional[str] = None,
     ) -> None:
-        self.max_levels = max_levels
+        self.max_levels = max_levels - 1  # Reserve 0 for unseen categories
         self.default = default
         self.cat_types: Dict[str, CategoricalDtype] = {}
 

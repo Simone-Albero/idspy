@@ -29,6 +29,7 @@ preprocessing:
       max_levels: ${max_cat_levels}
 
     - _target_: label_map
+      benign_tag: ${data.benign_tag}
 
 
   final_steps:
@@ -46,6 +47,17 @@ training:
       fmt: ${data.format}
 
     - _target_: allocate_split_partitions
+      train_key: train.data
+      val_key: val.data
+      test_key: test.data
+
+    - _target_: filter
+      df_key: train.data
+      query: original_${data.target_column} == '${data.benign_tag}'
+
+    - _target_: filter
+      df_key: val.data
+      query: original_${data.target_column} == '${data.benign_tag}'
 
     - _target_: build_model
       model_config: ${model}

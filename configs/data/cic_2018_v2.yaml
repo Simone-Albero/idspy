@@ -49,9 +49,10 @@ categorical_columns:
   - DNS_QUERY_ID
   - DNS_QUERY_TYPE
 
-num_numeric: 29
+num_numerical: 29
 num_categorical: 11
 
 train_size: 0.85
 val_size: 0.1
 test_size: 0.05
+benign_tag: Benign

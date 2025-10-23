@@ -42,7 +42,7 @@ class ClassificationLoss(BaseLoss):
     def forward(
         self,
         out: Tensor,
-        target: Optional[Tensor],
+        target: Tensor,
     ) -> Tensor:
         """Compute cross-entropy loss.
 

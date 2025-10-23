@@ -1,4 +1,4 @@
-from typing import Sequence, Optional, Callable, Mapping, Any
+from typing import Any, Sequence, Optional, Callable, Mapping
 
 import torch
 from torch import nn
@@ -6,8 +6,8 @@ from torch import nn
 from ..module.mlp import MLPBlock
 
 
-class NumericDecoder(nn.Module):
-    """Decoder for numeric features using MLP."""
+class NumericalDecoder(nn.Module):
+    """Decoder for numerical features using MLP."""
 
     def __init__(
         self,
@@ -61,10 +61,6 @@ class CategoricalDecoder(nn.Module):
         bias: bool = True,
     ) -> None:
         super().__init__()
-        if num_categorical is None and cat_cardinalities is None:
-            raise ValueError(
-                "Either num_categorical or cat_cardinalities must be provided."
-            )
 
         self.cat_cardinalities = cat_cardinalities or [max_emb_dim] * num_categorical
         hidden_dims = list(hidden_dims)
@@ -112,12 +108,12 @@ class CategoricalDecoder(nn.Module):
 
 
 class TabularDecoder(nn.Module):
-    """Unified decoder for numeric and categorical features."""
+    """Unified decoder for numerical and categorical features."""
 
     def __init__(
         self,
         in_features: int,
-        num_numeric: int,
+        num_numerical: int,
         num_categorical: Optional[int] = None,
         cat_cardinalities: Optional[Sequence[int]] = None,
         max_emb_dim: int = 50,
@@ -128,12 +124,7 @@ class TabularDecoder(nn.Module):
         bias: bool = True,
     ) -> None:
         super().__init__()
-        self.num_numeric = num_numeric
-
-        if num_categorical is None and cat_cardinalities is None:
-            raise ValueError(
-                "Either num_categorical or cat_cardinalities must be provided."
-            )
+        self.num_numerical = num_numerical
 
         self.cat_cardinalities = cat_cardinalities or [max_emb_dim] * num_categorical
         hidden_dims = list(hidden_dims)
@@ -155,7 +146,7 @@ class TabularDecoder(nn.Module):
             trunk_out_features = in_features
 
         # Numeric features head
-        self.numeric_head = nn.Linear(trunk_out_features, num_numeric)
+        self.numerical_head = nn.Linear(trunk_out_features, num_numerical)
 
         # Separate classification head for each categorical feature
         self.cat_heads = nn.ModuleList(
@@ -165,24 +156,27 @@ class TabularDecoder(nn.Module):
             ]
         )
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, list[torch.Tensor]]:
+    def forward(self, x: torch.Tensor) -> Mapping[str, Any]:
         """Forward pass.
 
         Args:
             x: Tensor of shape [batch_size, latent_dim]
 
         Returns:
-            Tuple containing:
-                - Tensor of shape [batch_size, num_numeric] for reconstructed numeric features
-                - List of logits tensors for each categorical feature, each of shape [batch_size, cardinal
+            Dictionary with:
+                - 'numerical': Tensor of shape [batch_size, num_numerical]
+                - 'categorical': List of logits tensors for each categorical feature,each of shape [batch_size, cardinality]
         """
 
         decoded_features = self.decoder_trunk(x)
 
-        # Generate numeric reconstructions
-        reconstructed_numeric = self.numeric_head(decoded_features)
+        # Generate numerical reconstructions
+        reconstructed_numerical = self.numerical_head(decoded_features)
 
         # Generate logits for each categorical feature
         reconstructed_cat_logits = [head(decoded_features) for head in self.cat_heads]
 
-        return reconstructed_numeric, reconstructed_cat_logits
+        return {
+            "numerical": reconstructed_numerical,
+            "categorical": reconstructed_cat_logits,
+        }

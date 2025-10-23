@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Tuple
 
 from torch import Tensor
 import torch
@@ -26,7 +26,7 @@ class NumericReconstructionLoss(BaseLoss):
     def forward(
         self,
         out: Tensor,
-        target: Optional[Tensor],
+        target: Tensor,
     ) -> Tensor:
         """Compute reconstruction loss.
 
@@ -85,7 +85,7 @@ class CategoricalReconstructionLoss(BaseLoss):
     def forward(
         self,
         out: Tensor,
-        target: Optional[Tensor],
+        target: Tensor,
     ) -> Tensor:
         """Compute categorical reconstruction loss.
 
@@ -139,23 +139,24 @@ class TabularReconstructionLoss(BaseLoss):
 
     def forward(
         self,
-        out: Tensor,
-        target: Optional[Tensor],
+        out_numerical: Tensor,
+        out_categorical: List[Tensor],
+        target_numerical: Tensor,
+        target_categorical: Tensor,
     ) -> Tensor:
         """Compute combined reconstruction loss with learnable weighting.
 
         Args:
-            out: Tuple of (numeric_out, categorical_out)
-            target: Tuple of (numeric_target, categorical_target)
+            out_numerical: Reconstructed numerical features [batch_size, num_numerical]
+            out_categorical: List of logits tensors for each categorical feature
+            target_numerical: Original numerical features [batch_size, num_numerical]
+            target_categorical: Original categorical features [batch_size, n_cat_features]
 
         Returns:
             Weighted combination of numeric and categorical losses
         """
-        numeric_out, categorical_out = out
-        numeric_target, categorical_target = target
-
-        numeric_loss = self.numeric_loss(numeric_out, numeric_target)
-        categorical_loss = self.categorical_loss(categorical_out, categorical_target)
+        numeric_loss = self.numeric_loss(out_numerical, target_numerical)
+        categorical_loss = self.categorical_loss(out_categorical, target_categorical)
 
         # Use learnable weight for categorical loss
         loss = numeric_loss + self.alpha * categorical_loss
