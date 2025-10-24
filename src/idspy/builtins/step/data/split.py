@@ -60,7 +60,7 @@ class StratifiedSplit(Step):
 
     def __init__(
         self,
-        class_column: str,
+        class_col: str,
         train_size: float = 0.7,
         val_size: float = 0.15,
         test_size: float = 0.15,
@@ -72,7 +72,7 @@ class StratifiedSplit(Step):
         self.train_size = train_size
         self.val_size = val_size
         self.test_size = test_size
-        self.class_column = class_column
+        self.class_col = class_col
 
         super().__init__(name=name or "stratified_split")
         self.key_map = {
@@ -86,7 +86,7 @@ class StratifiedSplit(Step):
 
     def compute(self, df: pd.DataFrame, seed: int) -> Optional[Dict[str, Any]]:
 
-        if not isinstance(self.class_column, str):
+        if not isinstance(self.class_col, str):
             raise ValueError("stratified_split: 'class_column' must be a string.")
 
         if df.empty:
@@ -94,7 +94,7 @@ class StratifiedSplit(Step):
 
         split_mapping = stratified_split(
             df,
-            self.class_column,
+            self.class_col,
             train_size=self.train_size,
             val_size=self.val_size,
             test_size=self.test_size,
@@ -107,7 +107,9 @@ class StratifiedSplit(Step):
 
 @StepFactory.register()
 @Step.needs("df")
-class AllocateSplitPartitions(Step):
+class ExtractSplitPartitions(Step):
+    """Extract train/val/test partitions from a DataFrame having TabAccessor."""
+
     def __init__(
         self,
         df_key: str = "data.base_df",
@@ -116,7 +118,7 @@ class AllocateSplitPartitions(Step):
         test_key: str = "test.data",
         name: Optional[str] = None,
     ) -> None:
-        super().__init__(name=name or "allocate_split_partitions")
+        super().__init__(name=name or "extract_split_partitions")
         self.key_map = {
             "df": df_key,
             "train": train_key,

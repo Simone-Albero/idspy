@@ -10,14 +10,14 @@ from .. import StepFactory
 
 
 @StepFactory.register()
-@Step.needs("vectors", "targets")
+@Step.needs("vectors", "labels")
 class VectorsProjectionPlot(Step):
 
     def __init__(
         self,
         name: Optional[str] = None,
         vectors_key: str = "vectors",
-        targets_key: str = "targets",
+        labels_key: str = "labels",
         output_key: str = "projection_plot",
         n_components: int = 2,
         sample_size: int = 30000,
@@ -30,7 +30,7 @@ class VectorsProjectionPlot(Step):
         self.sample_size = sample_size
         self.key_map = {
             "vectors": vectors_key,
-            "targets": targets_key,
+            "labels": labels_key,
             "output": output_key,
         }
 
@@ -38,12 +38,12 @@ class VectorsProjectionPlot(Step):
         return self.key_map
 
     def compute(
-        self, vectors: np.ndarray, targets: np.ndarray
+        self, vectors: np.ndarray, labels: np.ndarray
     ) -> Optional[Dict[str, Any]]:
 
-        X_sampled, targets_sampled = sample_vectors_and_labels(
+        X_sampled, labels_sampled = sample_vectors_and_labels(
             vectors,
-            targets,
+            labels,
             sample_size=self.sample_size,
         )
 
@@ -57,7 +57,7 @@ class VectorsProjectionPlot(Step):
         return {
             "output": {
                 f"{self.n_components}d_projection": vectors_plot(
-                    X_compressed, targets_sampled
+                    X_compressed, labels_sampled
                 )
             }
         }

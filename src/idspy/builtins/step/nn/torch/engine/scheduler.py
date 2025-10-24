@@ -4,7 +4,6 @@ import logging
 import torch
 
 from ......core.step.base import Step
-from ......nn.torch.model.base import BaseModel
 from .... import StepFactory
 
 logger = logging.getLogger(__name__)
@@ -23,9 +22,11 @@ class EpochWiseScheduler(Step):
         super().__init__(name=name or "early_stopping")
 
         self.key_map = {
-            "metrics": metrics_key or "metrics",
             "scheduler": scheduler_key,
         }
+
+        if metrics_key is not None:
+            self.key_map["metrics"] = metrics_key
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map

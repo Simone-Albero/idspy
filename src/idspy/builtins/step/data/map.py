@@ -83,7 +83,7 @@ class LabelMap(FittableStep):
         benign_tag: Optional[str] = None,
         default: int = -1,
         df_key: str = "data.base_df",
-        target_mapping_key: str = "data.target_mapping",
+        labels_mapping_key: str = "data.label_mapping",
         name: Optional[str] = None,
     ) -> None:
         self.benign_tag = benign_tag
@@ -93,7 +93,7 @@ class LabelMap(FittableStep):
         super().__init__(name=name or "label_map")
         self.key_map = {
             "df": df_key,
-            "target_mapping": target_mapping_key,
+            "labels_mapping": labels_mapping_key,
         }
 
     def bindings(self) -> Dict[str, str]:
@@ -114,22 +114,22 @@ class LabelMap(FittableStep):
         self.cat_types = CategoricalDtype(categories=vc.index.tolist(), ordered=True)
 
     def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        tgt_col = df.tab.schema.target
+        label_col = df.tab.schema.target
 
-        prev = df[tgt_col].copy()
+        prev = df[label_col].copy()
 
         if self.benign_tag is not None:
-            tgt = (prev == self.benign_tag).astype("int32")
-            tgt = tgt.where(tgt == 0, 1)
+            labels = (prev == self.benign_tag).astype("int32")
+            labels = labels.where(labels == 0, 1)
         else:
             s = prev.astype(self.cat_types)
             codes = s.cat.codes
-            tgt = pd.Series(
+            labels = pd.Series(
                 np.where(codes != -1, codes, self.default).astype("int32"),
                 index=s.index,
-                name=tgt_col,
+                name=label_col,
             )
 
-        df[f"original_{tgt_col}"] = prev
-        df.tab.target = tgt
-        return {"df": df, "target_mapping": self.cat_types}
+        df[f"original_{label_col}"] = prev
+        df.tab.target = labels
+        return {"df": df, "labels_mapping": self.cat_types}

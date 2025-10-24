@@ -15,13 +15,13 @@ class BuildModel(Step):
 
     def __init__(
         self,
-        model_config: Dict[str, Any],
+        model_args: Dict[str, Any],
         model_key: str = "model",
         name: Optional[str] = None,
     ) -> None:
 
         super().__init__(name=name or "build_model")
-        self.model_config = model_config
+        self.model_args = model_args
         self.key_map = {
             "model": model_key,
         }
@@ -30,5 +30,5 @@ class BuildModel(Step):
         return self.key_map
 
     def compute(self, device: torch.device) -> Optional[Dict[str, Any]]:
-        model = ModelFactory.create(self.model_config).to(device)
+        model = ModelFactory.create(self.model_args).to(device)
         return {"model": model}

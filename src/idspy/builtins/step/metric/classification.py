@@ -9,7 +9,7 @@ from .. import StepFactory
 
 
 @StepFactory.register()
-@Step.needs("predictions", "targets")
+@Step.needs("predictions", "labels")
 class ClassificationMetrics(Step):
     """Compute metrics for multiclass classification."""
 
@@ -17,7 +17,7 @@ class ClassificationMetrics(Step):
         self,
         name: Optional[str] = None,
         predictions_key: str = "predictions",
-        targets_key: str = "targets",
+        labels_key: str = "labels",
         metrics_key: str = "classification_metrics",
         class_names: Optional[list] = None,
     ) -> None:
@@ -26,7 +26,7 @@ class ClassificationMetrics(Step):
         self.class_names = class_names
         self.key_map = {
             "predictions": predictions_key,
-            "targets": targets_key,
+            "labels": labels_key,
             "metrics": metrics_key,
         }
 
@@ -79,28 +79,28 @@ class ClassificationMetrics(Step):
         return metrics
 
     def compute(
-        self, predictions: np.ndarray, targets: np.ndarray
+        self, predictions: np.ndarray, labels: np.ndarray
     ) -> Optional[Dict[str, Any]]:
-        metrics = self._compute_metrics(predictions, targets)
+        metrics = self._compute_metrics(predictions, labels)
         return {"metrics": metrics}
 
 
 @StepFactory.register()
-@Step.needs("predictions", "targets")
+@Step.needs("predictions", "labels")
 class UnsupervisedClassificationMetrics(Step):
 
     def __init__(
         self,
         name: Optional[str] = None,
         predictions_key: str = "predictions",
-        targets_key: str = "targets",
+        labels_key: str = "labels",
         metrics_key: str = "roc_auc_metrics",
     ) -> None:
 
         super().__init__(name=name or "unsupervised_classification_metrics")
         self.key_map = {
             "predictions": predictions_key,
-            "targets": targets_key,
+            "labels": labels_key,
             "metrics": metrics_key,
         }
 
@@ -108,11 +108,11 @@ class UnsupervisedClassificationMetrics(Step):
         return self.key_map
 
     def compute(
-        self, predictions: np.ndarray, targets: np.ndarray
+        self, predictions: np.ndarray, labels: np.ndarray
     ) -> Optional[Dict[str, Any]]:
         """Compute ROC AUC for unsupervised classification."""
-        targets = 1 - targets  # invert targets for anomaly detection
-        fpr, tpr, _ = roc_curve(targets, predictions)
+        labels = 1 - labels  # invert labels for anomaly detection
+        fpr, tpr, _ = roc_curve(labels, predictions)
         roc_auc = auc(fpr, tpr)
 
         return {"metrics": {"roc_auc": roc_auc_plot(fpr, tpr, roc_auc)}}

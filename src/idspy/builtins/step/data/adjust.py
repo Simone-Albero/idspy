@@ -2,7 +2,6 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
-from omegaconf import OmegaConf
 
 from ....core.step.base import Step
 from ....data.tab_accessor import reattach_meta
@@ -117,16 +116,18 @@ class Log1p(Step):
 
 @StepFactory.register()
 @Step.needs("df")
-class ToNumpy(Step):
+class ColsToNumpy(Step):
+    """Convert specified columns of a DataFrame to a NumPy array."""
+
     def __init__(
         self,
         df_key: str = "test.data",
         output_key: str = "test.targets",
-        columns: Optional[list] = None,
+        cols: Optional[list] = None,
         name: Optional[str] = None,
     ) -> None:
         super().__init__(name=name or "to_numpy")
-        self.columns = columns
+        self.cols = cols
         self.key_map = {
             "df": df_key,
             "output": output_key,
@@ -136,21 +137,7 @@ class ToNumpy(Step):
         return self.key_map
 
     def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        if self.columns is not None:
-            # Convert OmegaConf to native Python and resolve interpolations
-            columns = OmegaConf.to_container(self.columns, resolve=True)
-
-            # Flatten nested lists recursively
-            def flatten(lst):
-                result = []
-                for item in lst:
-                    if isinstance(item, list):
-                        result.extend(flatten(item))
-                    else:
-                        result.append(item)
-                return result
-
-            columns = flatten(columns) if len(columns) > 1 else str(columns[0])
-            return {"output": df[columns].values}
+        if self.cols is not None:
+            return {"output": df[self.cols].values}
 
         return {"output": df.values}

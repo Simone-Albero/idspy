@@ -1,7 +1,6 @@
 from typing import Optional, Any, Dict, List
 
 import torch
-import pandas as pd
 import numpy as np
 
 from ......nn.torch.model.base import ModelOutput
@@ -10,14 +9,14 @@ from .... import StepFactory
 
 
 @StepFactory.register()
-@Step.needs("inputs")
+@Step.needs("tensors")
 class CatTensors(Step):
     """Stack model outputs into a single tensor."""
 
     def __init__(
         self,
-        inputs_key: str = "inputs",
-        outputs_key: str = "outputs",
+        tensors_key: str = "tensors",
+        output_key: str = "output",
         to_cpu: bool = False,
         to_numpy: bool = False,
         cat_dim: int = 0,
@@ -31,26 +30,26 @@ class CatTensors(Step):
         self.to_cpu = to_cpu
         self.to_numpy = to_numpy
         self.key_map = {
-            "outputs": outputs_key,
-            "inputs": inputs_key,
+            "output": output_key,
+            "tensors": tensors_key,
         }
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def compute(self, inputs: List[ModelOutput]) -> Optional[Dict[str, Any]]:
-        outputs = []
-        for input in inputs:
-            outputs.append(input[self.section] if self.section else input)
+    def compute(self, tensors: List[ModelOutput]) -> Optional[Dict[str, Any]]:
+        output = []
+        for tensor in tensors:
+            output.append(tensor[self.section] if self.section else tensor)
 
-        if isinstance(outputs[0], torch.Tensor):
-            outputs = torch.cat(outputs, dim=self.cat_dim)
+        if isinstance(output[0], torch.Tensor):
+            output = torch.cat(output, dim=self.cat_dim)
             if self.to_cpu:
-                outputs = outputs.to(torch.device("cpu"))
+                output = output.to(torch.device("cpu"))
             if self.to_numpy:
-                outputs = outputs.numpy()
+                output = output.numpy()
 
-        return {"outputs": outputs}
+        return {"output": output}
 
 
 @StepFactory.register()
@@ -58,13 +57,13 @@ class CatTensors(Step):
 class ToTensor(Step):
     def __init__(
         self,
-        input_key: str = "test.features",
+        array_key: str = "test.features",
         output_key: str = "test.features_tensor",
         name: Optional[str] = None,
     ) -> None:
         super().__init__(name=name or "to_tensor")
         self.key_map = {
-            "array": input_key,
+            "array": array_key,
             "output": output_key,
         }
 

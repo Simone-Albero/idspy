@@ -115,7 +115,7 @@ def inter_class_separation(X: np.ndarray, labels: np.ndarray) -> float:
 
 
 @StepFactory.register()
-@Step.needs("vectors", "targets")
+@Step.needs("vectors", "labels")
 class ClusteringMetrics(Step):
     """Compute clustering metrics for latent space clusterability analysis.
 
@@ -132,7 +132,7 @@ class ClusteringMetrics(Step):
     def __init__(
         self,
         vectors_key: str = "vectors",
-        targets_key: str = "targets",
+        labels_key: str = "labels",
         outputs_key: str = "clustering_scores",
         scale_inputs: bool = True,
         sample_size: int = 10000,
@@ -145,7 +145,7 @@ class ClusteringMetrics(Step):
         self.pca_components = pca_components
         self.key_map = {
             "vectors": vectors_key,
-            "targets": targets_key,
+            "labels": labels_key,
             "outputs": outputs_key,
         }
 
@@ -153,11 +153,11 @@ class ClusteringMetrics(Step):
         return self.key_map
 
     def compute(
-        self, vectors: np.ndarray, targets: np.ndarray
+        self, vectors: np.ndarray, labels: np.ndarray
     ) -> Optional[Dict[str, Any]]:
-        X_sampled, targets_sampled = sample_vectors_and_labels(
+        X_sampled, labels_sampled = sample_vectors_and_labels(
             vectors,
-            targets,
+            labels,
             sample_size=self.sample_size,
         )
 
@@ -180,30 +180,30 @@ class ClusteringMetrics(Step):
 
         # Metrics based on true labels
         logger.info("Computing Silhouette score...")
-        scores["Silhouette"] = silhouette_score(X_compressed, targets_sampled)
+        scores["Silhouette"] = silhouette_score(X_compressed, labels_sampled)
 
         logger.info("Computing Calinski-Harabasz score...")
         scores["Calinski-Harabasz"] = calinski_harabasz_score(
-            X_compressed, targets_sampled
+            X_compressed, labels_sampled
         )
 
         logger.info("Computing Davies-Bouldin score...")
-        scores["Davies-Bouldin"] = davies_bouldin_score(X_compressed, targets_sampled)
+        scores["Davies-Bouldin"] = davies_bouldin_score(X_compressed, labels_sampled)
 
         # Custom metrics
         logger.info("Computing class separation...")
         scores["Class Separation"] = class_separation_score(
-            X_compressed, targets_sampled
+            X_compressed, labels_sampled
         )
 
         logger.info("Computing intra-class cohesion...")
         scores["Intra-class Cohesion"] = intra_class_cohesion(
-            X_compressed, targets_sampled
+            X_compressed, labels_sampled
         )
 
         logger.info("Computing inter-class separation...")
         scores["Inter-class Separation"] = inter_class_separation(
-            X_compressed, targets_sampled
+            X_compressed, labels_sampled
         )
 
         return {

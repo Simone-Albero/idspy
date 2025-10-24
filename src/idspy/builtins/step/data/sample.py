@@ -14,11 +14,11 @@ class DownsampleToMinority(Step):
 
     def __init__(
         self,
-        class_column: str,
+        class_col: str,
         df_key: str = "data.base_df",
         name: Optional[str] = None,
     ) -> None:
-        self.class_column = class_column
+        self.class_col = class_col
 
         super().__init__(name=name or "downsample_to_minority")
         self.key_map = {
@@ -31,10 +31,10 @@ class DownsampleToMinority(Step):
     def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
 
         # Early exits for edge cases
-        if df.empty or self.class_column not in df.columns:
+        if df.empty or self.class_col not in df.columns:
             return {"df": df}
 
-        counts = df[self.class_column].value_counts(dropna=False)
+        counts = df[self.class_col].value_counts(dropna=False)
         if counts.empty:
             return {"df": df}
 
@@ -44,7 +44,7 @@ class DownsampleToMinority(Step):
             return {"df": reattach_meta(df, sampled)}
 
         sampled = df.groupby(
-            self.class_column, dropna=False, group_keys=False, sort=False
+            self.class_col, dropna=False, group_keys=False, sort=False
         ).sample(n=minority, replace=False, random_state=self.random_state)
 
         return {"df": reattach_meta(df, sampled)}
@@ -58,7 +58,7 @@ class Downsample(Step):
     def __init__(
         self,
         frac: float,
-        class_column: Optional[str] = None,
+        class_col: Optional[str] = None,
         df_key: str = "data.base_df",
         name: Optional[str] = None,
     ) -> None:
@@ -66,7 +66,7 @@ class Downsample(Step):
             raise ValueError(f"downsample: frac must be in (0, 1], got {frac}.")
 
         self.frac = frac
-        self.class_column = class_column
+        self.class_col = class_col
 
         super().__init__(name=name or "downsample")
         self.key_map = {
@@ -81,9 +81,9 @@ class Downsample(Step):
         if df.empty:
             return {"df": df}
 
-        if self.class_column is not None and self.class_column in df.columns:
+        if self.class_col is not None and self.class_col in df.columns:
             sampled = df.groupby(
-                self.class_column, dropna=False, group_keys=False, sort=False
+                self.class_col, dropna=False, group_keys=False, sort=False
             ).sample(frac=self.frac, replace=False, random_state=self.random_state)
         else:
             # Global sampling (handles both None class_column and missing column cases)

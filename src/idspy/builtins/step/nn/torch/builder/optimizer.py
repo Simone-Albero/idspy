@@ -14,14 +14,14 @@ class BuildOptimizer(Step):
 
     def __init__(
         self,
-        optimizer_config: Dict[str, Any],
+        optimizer_args: Dict[str, Any],
         model_key: str = "model",
         optimizer_key: str = "optimizer",
         name: Optional[str] = None,
     ) -> None:
 
         super().__init__(name=name or "build_model")
-        self.optimizer_config = optimizer_config
+        self.optimizer_args = optimizer_args
         self.key_map = {
             "model": model_key,
             "optimizer": optimizer_key,
@@ -31,6 +31,6 @@ class BuildOptimizer(Step):
         return self.key_map
 
     def compute(self, model: torch.nn.Module) -> Optional[Dict[str, Any]]:
-        OptimizerClass = getattr(torch.optim, self.optimizer_config._target_)
-        optimizer = OptimizerClass(model.parameters(), **self.optimizer_config._params_)
+        OptimizerClass = getattr(torch.optim, self.optimizer_args._target_)
+        optimizer = OptimizerClass(model.parameters(), **self.optimizer_args._params_)
         return {"optimizer": optimizer}

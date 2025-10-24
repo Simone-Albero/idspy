@@ -9,7 +9,7 @@ from ... import StepFactory
 
 
 @StepFactory.register()
-@Step.needs("inputs")
+@Step.needs("data")
 class KMeans(Step):
     """Compute K-Means clustering on input data."""
 
@@ -19,8 +19,8 @@ class KMeans(Step):
         init: str = "k-means++",
         n_init: int = 10,
         max_iter: int = 300,
-        inputs_key: str = "inputs",
-        outputs_key: str = "kmeans_model",
+        data_key: str = "data",
+        output_key: str = "kmeans_model",
         name: Optional[str] = None,
     ) -> None:
         super().__init__(name=name or "compute_kmeans")
@@ -32,26 +32,26 @@ class KMeans(Step):
         )
 
         self.key_map = {
-            "inputs": inputs_key,
-            "outputs": outputs_key,
+            "data": data_key,
+            "output": output_key,
         }
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def compute(self, inputs: np.ndarray) -> Optional[Dict[str, Any]]:
-        self.kmeans.fit(inputs)
-        outputs = {
+    def compute(self, data: np.ndarray) -> Optional[Dict[str, Any]]:
+        self.kmeans.fit(data)
+        output = {
             "kmeans_model": self.kmeans,
             "cluster_centers": self.kmeans.cluster_centers_,
             "labels": self.kmeans.labels_,
             "inertia": self.kmeans.inertia_,
         }
-        return {"outputs": outputs}
+        return {"output": output}
 
 
 @StepFactory.register()
-@Step.needs("inputs")
+@Step.needs("data")
 class GaussianMixture(Step):
     """Compute Gaussian Mixture clustering on input data."""
 
@@ -60,8 +60,8 @@ class GaussianMixture(Step):
         n_clusters: int = 8,
         n_init: int = 10,
         max_iter: int = 300,
-        inputs_key: str = "inputs",
-        outputs_key: str = "gm_model",
+        data_key: str = "data",
+        output_key: str = "gm_model",
         name: Optional[str] = None,
     ) -> None:
         super().__init__(name=name or "compute_gm")
@@ -72,22 +72,22 @@ class GaussianMixture(Step):
         )
 
         self.key_map = {
-            "inputs": inputs_key,
-            "outputs": outputs_key,
+            "data": data_key,
+            "output": output_key,
         }
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def compute(self, inputs: np.ndarray) -> Optional[Dict[str, Any]]:
-        self.gm.fit(inputs)
-        outputs = {
+    def compute(self, data: np.ndarray) -> Optional[Dict[str, Any]]:
+        self.gm.fit(data)
+        output = {
             "gm_model": self.gm,
             "means": self.gm.means_,
             "covariances": self.gm.covariances_,
             "weights": self.gm.weights_,
-            "labels": self.gm.predict(inputs),
-            "aic": self.gm.aic(inputs),
-            "bic": self.gm.bic(inputs),
+            "labels": self.gm.predict(data),
+            "aic": self.gm.aic(data),
+            "bic": self.gm.bic(data),
         }
-        return {"outputs": outputs}
+        return {"output": output}
