@@ -133,7 +133,7 @@ class ClusteringMetrics(Step):
         self,
         vectors_key: str = "vectors",
         labels_key: str = "labels",
-        outputs_key: str = "clustering_scores",
+        metrics_key: str = "clustering_scores",
         scale_inputs: bool = True,
         sample_size: int = 10000,
         pca_components: int = 16,
@@ -146,7 +146,7 @@ class ClusteringMetrics(Step):
         self.key_map = {
             "vectors": vectors_key,
             "labels": labels_key,
-            "outputs": outputs_key,
+            "outputs": metrics_key,
         }
 
     def bindings(self) -> Dict[str, str]:
