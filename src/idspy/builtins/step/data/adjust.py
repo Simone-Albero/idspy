@@ -138,6 +138,9 @@ class ColsToNumpy(Step):
 
     def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         if self.cols is not None:
+            if len(self.cols) == 1:
+                return {"output": df[self.cols[0]].values}
+
             return {"output": df[self.cols].values}
 
         return {"output": df.values}
