@@ -20,12 +20,12 @@ class BuildDataset(Step):
         self,
         df_key: str = "data",
         dataset_key: str = "dataset",
-        target_col: Optional[str] = None,
+        label_col: Optional[str] = None,
         name: Optional[str] = None,
     ) -> None:
 
         super().__init__(name=name or "build_dataset")
-        self.target_col = target_col
+        self.label_col = label_col
         self.key_map = {
             "df": df_key,
             "dataset": dataset_key,
@@ -43,19 +43,19 @@ class BuildDataset(Step):
                 df,
                 numerical_cols=numerical_cols,
                 categorical_cols=categorical_cols,
-                target_col=self.target_col,
+                target_col=self.label_col,
             )
         elif numerical_cols:
             dataset = NumericalTensorDataset(
                 df,
                 feature_cols=numerical_cols,
-                target_col=self.target_col,
+                target_col=self.label_col,
             )
         elif categorical_cols:
             dataset = CategoricalTensorDataset(
                 df,
                 feature_cols=categorical_cols,
-                target_col=self.target_col,
+                target_col=self.label_col,
             )
         else:
             raise ValueError(
