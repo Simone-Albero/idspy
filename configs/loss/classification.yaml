@@ -1,4 +1,0 @@
-_target_: classification_loss
-reduction: mean
-ignore_index: -1
-label_smoothing: 0.0
