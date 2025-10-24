@@ -59,7 +59,7 @@ class LoadData(Step):
         load_meta: bool = True,
         numerical_cols: Optional[List[str]] = None,
         categorical_cols: Optional[List[str]] = None,
-        target_col: Optional[str] = None,
+        label_col: Optional[str] = None,
         df_key: str = "data.base_df",
         name: Optional[str] = None,
         **kwargs: Any,
@@ -70,7 +70,7 @@ class LoadData(Step):
         self.load_meta = load_meta
         self.numerical_cols = list(numerical_cols) if numerical_cols else None
         self.categorical_cols = list(categorical_cols) if categorical_cols else None
-        self.target_col = target_col
+        self.label_col = label_col
         self.kwargs = kwargs
 
         super().__init__(name=name or "load_data")
@@ -84,13 +84,13 @@ class LoadData(Step):
         if (
             self.numerical_cols is not None
             or self.categorical_cols is not None
-            or self.target_col is not None
+            or self.label_col is not None
         ):
             schema = Schema(
                 {
                     ColumnRole.NUMERICAL: self.numerical_cols or [],
                     ColumnRole.CATEGORICAL: self.categorical_cols or [],
-                    ColumnRole.TARGET: [self.target_col] if self.target_col else [],
+                    ColumnRole.TARGET: [self.label_col] if self.label_col else [],
                 }
             )
 
