@@ -7,6 +7,13 @@ train:
     shuffle: true
     pin_memory: false
 
+val:
+  dataloader:
+    batch_size: 1024
+    num_workers: 8
+    shuffle: false
+    pin_memory: false
+
 test:
 
   dataloader:

@@ -8,9 +8,9 @@ from torch.profiler import (
     tensorboard_trace_handler,
 )
 
-from ......core.step.base import Step
-from ......core.step.contextual import ContextualStep
-from ....factory import StepFactory
+from ....core.step.base import Step
+from ....core.step.contextual import ContextualStep
+from .. import StepFactory
 
 
 @StepFactory.register()

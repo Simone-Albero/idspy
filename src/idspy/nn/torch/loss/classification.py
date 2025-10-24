@@ -4,8 +4,10 @@ from torch import Tensor
 import torch.nn.functional as F
 
 from .base import BaseLoss
+from . import LossFactory
 
 
+@LossFactory.register()
 class ClassificationLoss(BaseLoss):
     """Cross-entropy loss for classification with hard labels."""
 
@@ -40,7 +42,7 @@ class ClassificationLoss(BaseLoss):
     def forward(
         self,
         out: Tensor,
-        target: Optional[Tensor],
+        target: Tensor,
     ) -> Tensor:
         """Compute cross-entropy loss.
 

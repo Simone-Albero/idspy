@@ -6,7 +6,7 @@ from torch.nn.utils import clip_grad_norm_
 
 from ..model.base import BaseModel, ModelOutput
 from ..loss.base import BaseLoss
-from ....data.torch.batch import Features, Batch, ensure_batch
+from ....data.torch.batch import Batch, ensure_batch
 
 
 def _forward_and_loss(
@@ -32,12 +32,13 @@ def eval_epoch(
     loss_fn: Optional[BaseLoss] = None,
     save_outputs: bool = False,
     profiler: Optional[torch.profiler.profile] = None,
-) -> Tuple[float, List[ModelOutput]]:
+) -> Tuple[float, List[torch.Tensor], List[ModelOutput]]:
     """Evaluation epoch: forward pass and optional loss computation."""
     model.eval()
 
     total_loss = 0.0
     outputs_list = []
+    losses_list = []
     pbar = tqdm(dataloader, desc="Evaluating", unit="batch")
 
     for batch in pbar:
@@ -48,15 +49,20 @@ def eval_epoch(
             outputs_list.append(outputs.detach().to(torch.device("cpu")))
 
         if loss is not None:
-            total_loss += loss.item()
+            if loss.dim() == 0:
+                total_loss += loss.item()
+            else:
+                total_loss += loss.mean().item()
+                losses_list.append(loss.detach().to(torch.device("cpu")))
 
         if profiler is not None:
             profiler.step()
 
-        pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+        if loss is not None:
+            pbar.set_postfix({"loss": f"{total_loss:.4f}"})
 
     avg_loss = total_loss / len(dataloader) if dataloader else 0.0
-    return avg_loss, outputs_list
+    return avg_loss, losses_list, outputs_list
 
 
 def train_epoch(
@@ -67,13 +73,16 @@ def train_epoch(
     loss_fn: BaseLoss,
     clip_grad_max_norm: Optional[float] = 1.0,
     profiler: Optional[torch.profiler.profile] = None,
-) -> Tuple[float, Optional[float], Optional[float]]:
+    scheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None,
+) -> Tuple[float, Optional[float], Optional[float | List[float]]]:
     """Training epoch: forward, backward, optimizer step with optional gradient clipping."""
     model.train()
 
     total_loss = 0.0
     grad_norm = None
     pbar = tqdm(dataloader, desc="Training", unit="batch")
+
+    lrs = []
 
     for batch in pbar:
         batch = ensure_batch(batch).to(device, non_blocking=True)
@@ -94,9 +103,15 @@ def train_epoch(
         if profiler is not None:
             profiler.step()
 
+        if scheduler is not None:
+            scheduler.step()
+            lrs.append(optimizer.param_groups[0].get("lr"))
+
         pbar.set_postfix({"loss": f"{loss.item():.4f}"})
 
     avg_loss = total_loss / len(dataloader) if dataloader else 0.0
-    lr = optimizer.param_groups[0].get("lr")
 
-    return avg_loss, grad_norm, lr
+    if lrs == []:
+        lrs = optimizer.param_groups[0].get("lr")
+
+    return avg_loss, grad_norm, lrs

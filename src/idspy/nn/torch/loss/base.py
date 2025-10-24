@@ -1,5 +1,3 @@
-from typing import Optional
-
 from torch import nn, Tensor
 
 
@@ -29,13 +27,12 @@ class BaseLoss(nn.Module):
             return loss.sum()
         return loss  # 'none'
 
-    def forward(self, out: Tensor, target: Optional[Tensor], **extras) -> Tensor:
+    def forward(self, out: Tensor, **extras) -> Tensor:
         """
         Compute the loss. Must be implemented by subclasses.
         Args:
             out: Model output (e.g., logits).
-            target: Target tensor or None.
-            **extras: Additional optional fields (e.g., mask, weights).
+            **extras: Additional optional fields (e.g., targets, weights).
         Returns:
             Loss tensor (scalar or per-sample if reduction='none').
         """

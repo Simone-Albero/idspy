@@ -1,12 +1,17 @@
-from typing import Optional
+import logging
+from typing import List
 
 from torch import Tensor
 import torch
 import torch.nn.functional as F
 
 from .base import BaseLoss
+from . import LossFactory
+
+logger = logging.getLogger(__name__)
 
 
+@LossFactory.register()
 class NumericReconstructionLoss(BaseLoss):
     """Loss for reconstructing numerical features."""
 
@@ -24,7 +29,7 @@ class NumericReconstructionLoss(BaseLoss):
     def forward(
         self,
         out: Tensor,
-        target: Optional[Tensor],
+        target: Tensor,
     ) -> Tensor:
         """Compute reconstruction loss.
 
@@ -39,6 +44,7 @@ class NumericReconstructionLoss(BaseLoss):
         return self._reduce(loss)
 
 
+@LossFactory.register()
 class CategoricalReconstructionLoss(BaseLoss):
     """Loss for reconstructing categorical features."""
 
@@ -82,7 +88,7 @@ class CategoricalReconstructionLoss(BaseLoss):
     def forward(
         self,
         out: Tensor,
-        target: Optional[Tensor],
+        target: Tensor,
     ) -> Tensor:
         """Compute categorical reconstruction loss.
 
@@ -99,6 +105,7 @@ class CategoricalReconstructionLoss(BaseLoss):
         return self._reduce(loss)
 
 
+@LossFactory.register()
 class TabularReconstructionLoss(BaseLoss):
     """Combined loss for reconstructing numeric and categorical features with learnable weighting."""
 
@@ -135,23 +142,24 @@ class TabularReconstructionLoss(BaseLoss):
 
     def forward(
         self,
-        out: Tensor,
-        target: Optional[Tensor],
+        out_numerical: Tensor,
+        out_categorical: List[Tensor],
+        target_numerical: Tensor,
+        target_categorical: Tensor,
     ) -> Tensor:
         """Compute combined reconstruction loss with learnable weighting.
 
         Args:
-            out: Tuple of (numeric_out, categorical_out)
-            target: Tuple of (numeric_target, categorical_target)
+            out_numerical: Reconstructed numerical features [batch_size, num_numerical]
+            out_categorical: List of logits tensors for each categorical feature
+            target_numerical: Original numerical features [batch_size, num_numerical]
+            target_categorical: Original categorical features [batch_size, n_cat_features]
 
         Returns:
             Weighted combination of numeric and categorical losses
         """
-        numeric_out, categorical_out = out
-        numeric_target, categorical_target = target
-
-        numeric_loss = self.numeric_loss(numeric_out, numeric_target)
-        categorical_loss = self.categorical_loss(categorical_out, categorical_target)
+        numeric_loss = self.numeric_loss(out_numerical, target_numerical)
+        categorical_loss = self.categorical_loss(out_categorical, target_categorical)
 
         # Use learnable weight for categorical loss
         loss = numeric_loss + self.alpha * categorical_loss
@@ -160,3 +168,7 @@ class TabularReconstructionLoss(BaseLoss):
     def get_alpha_value(self) -> float:
         """Get the current value of alpha as a float."""
         return self.alpha.item()
+
+    def __del__(self):
+        if self.learnable_weight:
+            logger.info(f"Final loss weight (alpha): {self.get_alpha_value():.4f}")

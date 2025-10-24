@@ -7,8 +7,8 @@ from ..module.mlp import MLPBlock
 from ..module.embedding import EmbeddingBlock
 
 
-class NumericEncoder(nn.Module):
-    """Encoder for numeric features using MLP."""
+class NumericalEncoder(nn.Module):
+    """Encoder for numerical features using MLP."""
 
     def __init__(
         self,
@@ -37,7 +37,7 @@ class NumericEncoder(nn.Module):
         """Forward pass.
 
         Args:
-            x: Tensor of shape [batch_size, n_numeric_features]
+            x: Tensor of shape [batch_size, n_numerical_features]
         Returns:
             Tensor of shape [batch_size, out_features]
         """
@@ -50,9 +50,10 @@ class CategoricalEncoder(nn.Module):
 
     def __init__(
         self,
-        cat_cardinalities: Sequence[int],
-        embed_dim: int,
         out_features: int,
+        num_categorical: Optional[int] = None,
+        cat_cardinalities: Optional[Sequence[int]] = None,
+        max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
         activation: Callable[[], nn.Module] = nn.ReLU,
@@ -63,14 +64,13 @@ class CategoricalEncoder(nn.Module):
         hidden_dims = list(hidden_dims)
 
         self.embedding = EmbeddingBlock(
-            cat_cardinalities=cat_cardinalities,
-            embed_dim=embed_dim,
-            dropout=dropout,
+            num_categorical, cat_cardinalities, max_emb_dim=max_emb_dim
         )
 
-        in_features = embed_dim * len(cat_cardinalities)
+        embed_features = sum(self.embedding.get_embedding_dims())
+
         self.encoder = MLPBlock(
-            in_features=in_features,
+            in_features=embed_features,
             out_features=out_features,
             hidden_dims=hidden_dims,
             activation=activation,
@@ -94,14 +94,15 @@ class CategoricalEncoder(nn.Module):
 
 
 class TabularEncoder(nn.Module):
-    """Unified encoder for numeric and categorical features."""
+    """Unified encoder for numerical and categorical features."""
 
     def __init__(
         self,
-        num_numeric: int,
-        cat_cardinalities: Sequence[int],
-        embed_dim: int,
+        num_numerical: int,
         out_features: int,
+        num_categorical: Optional[int] = None,
+        cat_cardinalities: Optional[Sequence[int]] = None,
+        max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
         activation: Callable[[], nn.Module] = nn.ReLU,
@@ -110,22 +111,15 @@ class TabularEncoder(nn.Module):
     ) -> None:
         super().__init__()
 
-        if num_numeric <= 0 or len(cat_cardinalities) <= 0:
-            raise ValueError(
-                "Both num_numeric and cat_cardinalities must be > 0 for TabularEncoder"
-            )
-
-        self.num_numeric = num_numeric
+        self.num_numerical = num_numerical
         self.cat_cardinalities = cat_cardinalities
 
         self.embedding = EmbeddingBlock(
-            cat_cardinalities=cat_cardinalities,
-            embed_dim=embed_dim,
-            dropout=dropout,
+            num_categorical, cat_cardinalities, max_emb_dim=max_emb_dim
         )
 
-        embed_features = embed_dim * len(cat_cardinalities)
-        total_features = num_numeric + embed_features
+        embed_features = sum(self.embedding.get_embedding_dims())
+        total_features = num_numerical + embed_features
 
         self.encoder = MLPBlock(
             in_features=total_features,
@@ -137,19 +131,21 @@ class TabularEncoder(nn.Module):
             bias=bias,
         )
 
-    def forward(self, x_num: torch.Tensor, x_cat: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, numerical: torch.Tensor, categorical: torch.Tensor
+    ) -> torch.Tensor:
         """Forward pass.
 
         Args:
-            x_num: Tensor of shape [batch_size, num_numeric]
-            x_cat: Tensor of shape [batch_size, n_cat_features]
+            numerical: Tensor of shape [batch_size, num_numerical]
+            categorical: Tensor of shape [batch_size, n_cat_features]
 
         Returns:
             Tensor of shape [batch_size, out_features]
         """
-        embedded_cat = self.embedding(x_cat)
+        embedded_cat = self.embedding(categorical)
 
-        combined = torch.cat([x_num, embedded_cat], dim=1)
+        combined = torch.cat([numerical, embedded_cat], dim=1)
         encoded = self.encoder(combined)
 
         return encoded

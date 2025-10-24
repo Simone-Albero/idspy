@@ -41,7 +41,9 @@ class Batch:
             targets=(
                 None
                 if self.targets is None
-                else self.targets.to(device, non_blocking=non_blocking)
+                else _map_tensors(
+                    self.targets, lambda t: t.to(device, non_blocking=non_blocking)
+                )
             ),
         )
 
@@ -110,6 +112,15 @@ def default_collate(samples: list[Mapping[str, Any]]) -> Batch:
 
     targets = None
     if "targets" in samples[0] and samples[0]["targets"] is not None:
-        targets = stack([s["targets"] for s in samples]).view(-1)
+        first_targets = samples[0]["targets"]
+        if isinstance(first_targets, Mapping):
+            keys = list(first_targets.keys())
+            target_lists = {k: [] for k in keys}
+            for s in samples:
+                for k in keys:
+                    target_lists[k].append(s["targets"][k])
+            targets = {k: stack(target_lists[k]) for k in keys}
+        else:
+            targets = stack([s["targets"] for s in samples]).view(-1)
 
     return Batch(features=features, targets=targets)

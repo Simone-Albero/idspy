@@ -6,7 +6,7 @@ from ......common.utils import PathLike
 from ......core.step.base import Step
 from ......nn.torch.model.base import BaseModel
 from ......nn.torch.module.repository import ModulesRepository
-from ....factory import StepFactory
+from .... import StepFactory
 
 
 @StepFactory.register()

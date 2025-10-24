@@ -3,7 +3,7 @@ import logging
 
 from ......core.step.base import Step
 from ......nn.torch.model.base import BaseModel
-from ....factory import StepFactory
+from .... import StepFactory
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class EarlyStopping(Step):
             self.num_bad_epochs = 0
             self.best_model = model
         else:
-            logger.info(f"EARLY_STOPPING {self.best_score:.6f} // {avg_loss:.6f}.")
+            logger.info(f"EARLY_STOPPING {self.best_score:.6f} <- {avg_loss:.6f}.")
             logger.info(f"EARLY_STOPPING {self.num_bad_epochs+1}/{self.patience}")
             self.num_bad_epochs += 1
 

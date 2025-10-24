@@ -1,4 +1,5 @@
 import logging
+import sys
 
 import torch
 from omegaconf import DictConfig
@@ -15,15 +16,11 @@ from src.idspy.core.pipeline.observable import (
     ObservableRepeatablePipeline,
 )
 from src.idspy.core.events.bus import EventBus
-
-from src.idspy.data.schema import Schema, ColumnRole
-from src.idspy.data.tab_accessor import TabAccessor
+from src.idspy.core.events.event import only_source
 
 from src.idspy.nn.torch.helper import get_device
-from src.idspy.nn.torch.model.classifier import TabularClassifier
-from src.idspy.nn.torch.loss.classification import ClassificationLoss
 
-from src.idspy.builtins.handler.logging import Logger
+from src.idspy.builtins.handler.logging import Logger, DataFrameProfiler
 
 from src.idspy.builtins.step import StepFactory
 
@@ -31,53 +28,25 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def main(cfg: DictConfig):
-    set_seeds(cfg.seed)
-
-    # Log available steps
-    logger.info(f"Registered {len(StepFactory.get_available_steps())} steps")
-    logger.debug(f"Available steps: {StepFactory.get_available_steps()}")
-
-    # Setup device
-    if cfg.device == "auto":
-        device = get_device()
-    else:
-        device = torch.device(cfg.device)
-
-    # Setup model
-    model = TabularClassifier(
-        num_numeric=len(cfg.data.numerical_columns),
-        cat_cardinalities=[cfg.max_frequency_levels]
-        * len(cfg.data.categorical_columns),
-        out_features=cfg.model.out_features,
-        hidden_dims=cfg.model.hidden_dims,
-        dropout=cfg.model.dropout,
-    ).to(device)
-
-    loss = ClassificationLoss().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.optimizer.lr)
-
-    # Setup storage
-    storage = DictStorage(
-        {
-            "device": device,
-            "model": model,
-            "loss_fn": loss,
-            "optimizer": optimizer,
-            "seed": cfg.seed,
-            "stop_pipeline": False,
-        }
-    )
-
-    # Setup event bus
+def preprocessing_pipeline(cfg: DictConfig, storage: DictStorage):
     bus = EventBus()
     bus.subscribe(callback=Logger(), event_type=PipelineEvent.STEP_START)
+    bus.subscribe(
+        callback=DataFrameProfiler(),
+        event_type=PipelineEvent.PIPELINE_END,
+        predicate=only_source("preprocessing_pipeline"),
+    )
 
-    # Build preprocessing pipeline from config
     logger.info("Building preprocessing pipeline from config...")
 
-    # Create fitted pipeline
+    # Collecting steps
+    base_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.base_steps)
     fitted_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.fitted_steps)
+    final_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.final_steps)
+    logger.info(
+        f"Preprocessing steps: base={len(base_steps)}, fitted={len(fitted_steps)}, final={len(final_steps)}"
+    )
+
     fit_aware_pipeline = ObservableFittablePipeline(
         steps=fitted_steps,
         name="fit_aware_pipeline",
@@ -85,21 +54,31 @@ def main(cfg: DictConfig):
         storage=storage,
     )
 
-    # Create base preprocessing steps
-    base_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.base_steps)
-    save_steps = StepFactory.create_from_list(cfg.pipeline.preprocessing.save_steps)
+    full_steps = base_steps + [fit_aware_pipeline] + final_steps
 
-    # Combine all preprocessing steps
     preprocessing_pipeline = ObservablePipeline(
-        steps=base_steps + [fit_aware_pipeline] + save_steps,
+        steps=full_steps,
         storage=storage,
         bus=bus,
         name="preprocessing_pipeline",
     )
 
-    # Build training pipeline from config
+    logger.info("Running preprocessing pipeline...")
+    preprocessing_pipeline.run()
+
+
+def training_pipeline(cfg: DictConfig, storage: DictStorage):
+    bus = EventBus()
+    bus.subscribe(callback=Logger(), event_type=PipelineEvent.STEP_START)
+
     logger.info("Building training pipeline from config...")
+
+    setup_steps = StepFactory.create_from_list(cfg.pipeline.training.setup_steps)
     training_steps = StepFactory.create_from_list(cfg.pipeline.training.base_steps)
+    final_steps = StepFactory.create_from_list(cfg.pipeline.training.final_steps)
+    logger.info(
+        f"Training steps: setup={len(setup_steps)}, training={len(training_steps)}, final={len(final_steps)}"
+    )
 
     training_pipeline = ObservableRepeatablePipeline(
         steps=training_steps,
@@ -111,16 +90,71 @@ def main(cfg: DictConfig):
         storage=storage,
     )
 
-    # Run pipelines
-    logger.info("Running preprocessing pipeline...")
-    preprocessing_pipeline.run()
+    full_steps = setup_steps + [training_pipeline] + final_steps
+    full_pipeline = ObservablePipeline(
+        steps=full_steps,
+        storage=storage,
+        bus=bus,
+        name="full_pipeline",
+    )
 
     logger.info("Running training pipeline...")
-    training_pipeline.run()
+    full_pipeline.run()
 
-    logger.info("Pipelines completed.\n(-_-) Exiting.")
+
+def testing_pipeline(cfg: DictConfig, storage: DictStorage):
+    bus = EventBus()
+    bus.subscribe(callback=Logger(), event_type=PipelineEvent.STEP_START)
+
+    logger.info("Building testing pipeline from config...")
+
+    setup_steps = StepFactory.create_from_list(cfg.pipeline.testing.setup_steps)
+    testing_steps = StepFactory.create_from_list(cfg.pipeline.testing.base_steps)
+
+    logger.info(
+        f"Testing steps: setup={len(setup_steps)}, testing={len(testing_steps)}"
+    )
+
+    full_steps = setup_steps + testing_steps
+    full_pipeline = ObservablePipeline(
+        steps=full_steps,
+        storage=storage,
+        bus=bus,
+        name="full_pipeline",
+    )
+
+    logger.info("Running testing pipeline...")
+    full_pipeline.run()
+
+
+def main(cfg: DictConfig):
+    set_seeds(cfg.seed)
+
+    # Setup device
+    if cfg.device == "auto":
+        device = get_device()
+    else:
+        device = torch.device(cfg.device)
+
+    # Setup storage
+    storage = DictStorage(
+        {
+            "device": device,
+            "seed": cfg.seed,
+            "stop_pipeline": False,
+        }
+    )
+
+    if cfg.stage == "preprocessing":
+        preprocessing_pipeline(cfg, storage)
+    elif cfg.stage == "training":
+        training_pipeline(cfg, storage)
+    elif cfg.stage == "testing":
+        testing_pipeline(cfg, storage)
 
 
 if __name__ == "__main__":
-    cfg = load_config(config_path="configs", config_name="config")
+    cfg = load_config(
+        config_path="configs", config_name="config", overrides=sys.argv[1:]
+    )
     main(cfg)

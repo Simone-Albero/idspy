@@ -15,7 +15,7 @@ class PartitionName(str, Enum):
     TEST = "test"
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, eq=False)
 class Partition:
     """Hold train/val/test split definitions by index labels."""
 

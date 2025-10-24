@@ -25,7 +25,7 @@ class ColumnRole(Enum):
         raise KeyError(f"Unknown role: {name}")
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, eq=False)
 class Schema:
     """Store roles (types) of dataframe columns."""
 

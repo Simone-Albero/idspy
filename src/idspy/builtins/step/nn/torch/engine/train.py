@@ -6,11 +6,11 @@ from ......core.step.base import Step
 from ......nn.torch.model.base import BaseModel
 from ......nn.torch.loss.base import BaseLoss
 from ......nn.torch.engine.loops import train_epoch
-from ....factory import StepFactory
+from .... import StepFactory
 
 
 @StepFactory.register()
-@Step.needs("dataloader", "model", "loss_fn", "optimizer", "device")
+@Step.needs("dataloader", "model", "loss_fn", "optimizer", "device", "scheduler")
 class TrainOneEpoch(Step):
     """Train model for one epoch."""
 
@@ -21,6 +21,7 @@ class TrainOneEpoch(Step):
         model_key: str = "model",
         loss_key: str = "loss_fn",
         optimizer_key: str = "optimizer",
+        scheduler_key: str = "scheduler",
         device_key: str = "device",
         metrics_key: str = "train.metrics",
         name: Optional[str] = None,
@@ -33,6 +34,7 @@ class TrainOneEpoch(Step):
             "model": model_key,
             "loss_fn": loss_key,
             "optimizer": optimizer_key,
+            "scheduler": scheduler_key,
             "device": device_key,
             "metrics": metrics_key,
         }
@@ -47,6 +49,7 @@ class TrainOneEpoch(Step):
         loss_fn: BaseLoss,
         optimizer: torch.optim.Optimizer,
         device: torch.device,
+        scheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None,
         context: Optional[any] = None,
     ) -> Optional[Dict[str, Any]]:
 
@@ -55,6 +58,7 @@ class TrainOneEpoch(Step):
             model=model,
             device=device,
             optimizer=optimizer,
+            scheduler=scheduler,
             loss_fn=loss_fn,
             clip_grad_max_norm=self.clip_grad_max_norm,
             profiler=context,

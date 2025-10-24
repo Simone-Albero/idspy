@@ -1,10 +1,11 @@
 from typing import Optional, Dict, Any
 
 import numpy as np
+from sklearn.metrics import roc_curve, auc
 
-from ......core.step.base import Step
-from ......plot.score import confusion_matrix_to_plot, dict_to_bar_plot
-from ....factory import StepFactory
+from ....core.step.base import Step
+from ....plot.score import confusion_matrix_to_plot, dict_to_bar_plot, roc_auc_plot
+from .. import StepFactory
 
 
 @StepFactory.register()
@@ -32,7 +33,9 @@ class ClassificationMetrics(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def compute_metrics(self, y_pred: np.ndarray, y_true: np.ndarray) -> Dict[str, Any]:
+    def _compute_metrics(
+        self, y_pred: np.ndarray, y_true: np.ndarray
+    ) -> Dict[str, Any]:
         """Compute classification metrics."""
         from sklearn.metrics import (
             accuracy_score,
@@ -75,6 +78,41 @@ class ClassificationMetrics(Step):
 
         return metrics
 
-    def compute(self, predictions: np.ndarray, targets: np.ndarray) -> None:
-        metrics = self.compute_metrics(predictions, targets)
+    def compute(
+        self, predictions: np.ndarray, targets: np.ndarray
+    ) -> Optional[Dict[str, Any]]:
+        metrics = self._compute_metrics(predictions, targets)
         return {"metrics": metrics}
+
+
+@StepFactory.register()
+@Step.needs("predictions", "targets")
+class UnsupervisedClassificationMetrics(Step):
+
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        predictions_key: str = "predictions",
+        targets_key: str = "targets",
+        metrics_key: str = "roc_auc_metrics",
+    ) -> None:
+
+        super().__init__(name=name or "unsupervised_classification_metrics")
+        self.key_map = {
+            "predictions": predictions_key,
+            "targets": targets_key,
+            "metrics": metrics_key,
+        }
+
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def compute(
+        self, predictions: np.ndarray, targets: np.ndarray
+    ) -> Optional[Dict[str, Any]]:
+        """Compute ROC AUC for unsupervised classification."""
+        targets = 1 - targets  # invert targets for anomaly detection
+        fpr, tpr, _ = roc_curve(targets, predictions)
+        roc_auc = auc(fpr, tpr)
+
+        return {"metrics": {"roc_auc": roc_auc_plot(fpr, tpr, roc_auc)}}
