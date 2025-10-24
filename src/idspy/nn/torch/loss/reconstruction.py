@@ -1,4 +1,5 @@
-from typing import List, Tuple
+import logging
+from typing import List
 
 from torch import Tensor
 import torch
@@ -6,6 +7,8 @@ import torch.nn.functional as F
 
 from .base import BaseLoss
 from . import LossFactory
+
+logger = logging.getLogger(__name__)
 
 
 @LossFactory.register()
@@ -165,3 +168,7 @@ class TabularReconstructionLoss(BaseLoss):
     def get_alpha_value(self) -> float:
         """Get the current value of alpha as a float."""
         return self.alpha.item()
+
+    def __del__(self):
+        if self.learnable_weight:
+            logger.info(f"Final loss weight (alpha): {self.get_alpha_value():.4f}")

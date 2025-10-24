@@ -32,12 +32,13 @@ def eval_epoch(
     loss_fn: Optional[BaseLoss] = None,
     save_outputs: bool = False,
     profiler: Optional[torch.profiler.profile] = None,
-) -> Tuple[float, List[ModelOutput]]:
+) -> Tuple[float, List[torch.Tensor], List[ModelOutput]]:
     """Evaluation epoch: forward pass and optional loss computation."""
     model.eval()
 
     total_loss = 0.0
     outputs_list = []
+    losses_list = []
     pbar = tqdm(dataloader, desc="Evaluating", unit="batch")
 
     for batch in pbar:
@@ -48,16 +49,20 @@ def eval_epoch(
             outputs_list.append(outputs.detach().to(torch.device("cpu")))
 
         if loss is not None:
-            total_loss += loss.item()
+            if loss.dim() == 0:
+                total_loss += loss.item()
+            else:
+                total_loss += loss.mean().item()
+                losses_list.append(loss.detach().to(torch.device("cpu")))
 
         if profiler is not None:
             profiler.step()
 
         if loss is not None:
-            pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+            pbar.set_postfix({"loss": f"{total_loss:.4f}"})
 
     avg_loss = total_loss / len(dataloader) if dataloader else 0.0
-    return avg_loss, outputs_list
+    return avg_loss, losses_list, outputs_list
 
 
 def train_epoch(

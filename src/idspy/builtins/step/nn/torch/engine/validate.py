@@ -25,6 +25,7 @@ class ValidateOneEpoch(Step):
         device_key: str = "device",
         metrics_key: str = "val.metrics",
         outputs_key: str = "val.outputs",
+        losses_key: str = "val.losses",
         name: Optional[str] = None,
     ) -> None:
         self.save_outputs = save_outputs
@@ -37,6 +38,7 @@ class ValidateOneEpoch(Step):
             "device": device_key,
             "metrics": metrics_key,
             "outputs": outputs_key,
+            "losses": losses_key,
         }
 
     def bindings(self) -> Dict[str, str]:
@@ -50,7 +52,7 @@ class ValidateOneEpoch(Step):
         loss_fn: Optional[BaseLoss] = None,
         context: Optional[any] = None,
     ) -> Optional[Dict[str, Any]]:
-        average_loss, model_outputs = eval_epoch(
+        average_loss, losses, model_outputs = eval_epoch(
             dataloader=dataloader,
             model=model,
             device=device,
@@ -62,6 +64,7 @@ class ValidateOneEpoch(Step):
         return {
             "model": model,
             "metrics": {"avg_loss": average_loss},
+            "losses": losses,
             "outputs": model_outputs,
         }
 
@@ -106,7 +109,7 @@ class ForwardOnce(Step):
 
 
 @StepFactory.register()
-@Step.needs("inputs", "pred_fn")
+@Step.needs("inputs", "pred_fn", "extra")
 class MakePredictions(Step):
     """Make predictions from model outputs."""
 
@@ -115,6 +118,7 @@ class MakePredictions(Step):
         inputs_key: str = "inputs",
         pred_key: str = "pred_fn",
         outputs_key: str = "outputs",
+        extra_key: Optional[str] = None,
         name: Optional[str] = None,
     ) -> None:
         super().__init__(name=name or "make_predictions")
@@ -124,11 +128,17 @@ class MakePredictions(Step):
             "pred_fn": pred_key,
         }
 
+        if extra_key is not None:
+            self.key_map["extra"] = extra_key
+
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
     def compute(
-        self, inputs: torch.Tensor, pred_fn: Callable
+        self,
+        inputs: torch.Tensor,
+        pred_fn: Callable,
+        extra: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
-        predictions = make_predictions(inputs, pred_fn).detach().cpu().numpy()
+        predictions = make_predictions(pred_fn, inputs, extra).detach().cpu().numpy()
         return {"outputs": predictions}

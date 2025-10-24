@@ -129,25 +129,3 @@ class AllocateSplitPartitions(Step):
 
     def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         return {"train": df.tab.train, "val": df.tab.val, "test": df.tab.test}
-
-
-@StepFactory.register()
-@Step.needs("df")
-class AllocateTargets(Step):
-    def __init__(
-        self,
-        df_key: str = "test.data",
-        targets_key: str = "test.targets",
-        name: Optional[str] = None,
-    ) -> None:
-        super().__init__(name=name or "allocate_targets")
-        self.key_map = {
-            "df": df_key,
-            "targets": targets_key,
-        }
-
-    def bindings(self) -> Dict[str, str]:
-        return self.key_map
-
-    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        return {"targets": df.tab.target.to_numpy()}
