@@ -92,7 +92,7 @@ class TabAccessor:
 
     @property
     def features(self) -> pd.DataFrame:
-        """Feature view (excludes target)."""
+        """Feature view (excludes label)."""
         return self._get_view_for_role(ColumnRole.FEATURES)
 
     @features.setter
@@ -101,18 +101,18 @@ class TabAccessor:
         self._assign_block(updated, cols=cols)
 
     @property
-    def target(self) -> pd.DataFrame:
+    def label(self) -> pd.DataFrame:
         """Target view."""
-        cols = self._get_columns_for_role(ColumnRole.TARGET)
+        cols = self._get_columns_for_role(ColumnRole.LABEL)
         if not cols:
-            raise ValueError("No target is defined in the schema.")
-        return self._get_view_for_role(ColumnRole.TARGET)
+            raise ValueError("No label is defined in the schema.")
+        return self._get_view_for_role(ColumnRole.LABEL)
 
-    @target.setter
-    def target(self, updated: pd.DataFrame) -> None:
-        cols = self._get_columns_for_role(ColumnRole.TARGET)
+    @label.setter
+    def label(self, updated: pd.DataFrame) -> None:
+        cols = self._get_columns_for_role(ColumnRole.LABEL)
         if not cols:
-            raise ValueError("No target is defined in the schema.")
+            raise ValueError("No label is defined in the schema.")
         self._assign_block(updated, cols=cols)
 
     @property
@@ -215,22 +215,22 @@ class TabAccessor:
         df = self._obj
         upd = updated.to_frame() if isinstance(updated, pd.Series) else updated
 
-        target_index = df.index[mask] if mask is not None else df.index
+        label_index = df.index[mask] if mask is not None else df.index
 
         if cols is None:
-            target_cols = df.columns
+            label_cols = df.columns
         elif isinstance(cols, str):
-            target_cols = pd.Index([cols])
+            label_cols = pd.Index([cols])
         else:
-            target_cols = pd.Index(cols)
+            label_cols = pd.Index(cols)
 
-        common_index = target_index.intersection(upd.index)
+        common_index = label_index.intersection(upd.index)
         if not len(common_index):
             raise ValueError(
                 "No overlapping rows between destination and updated (index misaligned)."
             )
 
-        common_cols = target_cols.intersection(upd.columns)
+        common_cols = label_cols.intersection(upd.columns)
         if not len(common_cols):
             raise ValueError("No overlapping columns between destination and updated.")
 

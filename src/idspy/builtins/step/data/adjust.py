@@ -122,7 +122,7 @@ class ColsToNumpy(Step):
     def __init__(
         self,
         df_key: str = "test.data",
-        output_key: str = "test.targets",
+        output_key: str = "test.labels",
         cols: Optional[list] = None,
         name: Optional[str] = None,
     ) -> None:

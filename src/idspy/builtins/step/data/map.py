@@ -76,7 +76,7 @@ class FrequencyMap(FittableStep):
 @StepFactory.register()
 @Step.needs("df")
 class LabelMap(FittableStep):
-    """Encode `target`: binary with `benign_tag`, else ordinal categories."""
+    """Encode `label`: binary with `benign_tag`, else ordinal categories."""
 
     def __init__(
         self,
@@ -100,7 +100,7 @@ class LabelMap(FittableStep):
         return self.key_map
 
     def fit_impl(self, df: pd.DataFrame) -> None:
-        """Learn ordered categories for the target col (if not binary)."""
+        """Learn ordered categories for the label col (if not binary)."""
 
         # Early exit for binary case
         if self.benign_tag is not None:
@@ -108,13 +108,13 @@ class LabelMap(FittableStep):
             return
 
         train_df = df.tab.train
-        tgt_col = train_df.tab.schema.target
+        tgt_col = train_df.tab.schema.label
 
         vc = train_df[tgt_col].value_counts(dropna=False)
         self.cat_types = CategoricalDtype(categories=vc.index.tolist(), ordered=True)
 
     def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        label_col = df.tab.schema.target
+        label_col = df.tab.schema.label
 
         prev = df[label_col].copy()
 
@@ -131,5 +131,5 @@ class LabelMap(FittableStep):
             )
 
         df[f"original_{label_col}"] = prev
-        df.tab.target = labels
+        df.tab.label = labels
         return {"df": df, "labels_mapping": self.cat_types}

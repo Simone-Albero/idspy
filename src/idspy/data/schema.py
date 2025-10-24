@@ -10,7 +10,7 @@ class ColumnRole(Enum):
 
     NUMERICAL = "numerical"
     CATEGORICAL = "categorical"
-    TARGET = "target"
+    LABEL = "label"
     FEATURES = "features"
 
     @classmethod
@@ -40,7 +40,7 @@ class Schema:
         default_factory=lambda: {
             ColumnRole.NUMERICAL: [],
             ColumnRole.CATEGORICAL: [],
-            ColumnRole.TARGET: "",
+            ColumnRole.LABEL: "",
         }
     )
     strict: bool = False
@@ -54,14 +54,14 @@ class Schema:
 
         Args:
             roles: Dictionary mapping ColumnRole to columns.
-                   TARGET should be a single string or list with one element.
+                   LABEL should be a single string or list with one element.
                    NUMERICAL and CATEGORICAL should be lists of strings.
             strict: If True, raise error when pruning missing columns.
         """
         self.roles = {
             ColumnRole.NUMERICAL: [],
             ColumnRole.CATEGORICAL: [],
-            ColumnRole.TARGET: "",
+            ColumnRole.LABEL: "",
         }
         self.strict = strict
 
@@ -90,19 +90,19 @@ class Schema:
 
         new_cols = self._as_list(cols)
 
-        # Handle TARGET role differently (single string)
-        if role == ColumnRole.TARGET:
+        # Handle LABEL role differently (single string)
+        if role == ColumnRole.LABEL:
             if len(new_cols) > 1:
-                raise ValueError("TARGET role can only contain one column")
+                raise ValueError("LABEL role can only contain one column")
             col_to_add = new_cols[0] if new_cols else ""
             # Remove from other roles
             for r in [ColumnRole.NUMERICAL, ColumnRole.CATEGORICAL]:
                 self.roles[r] = [c for c in self.roles[r] if c != col_to_add]
             self.roles[role] = col_to_add
         else:
-            # Remove new_cols from TARGET if present
-            if self.roles[ColumnRole.TARGET] in new_cols:
-                self.roles[ColumnRole.TARGET] = ""
+            # Remove new_cols from LABEL if present
+            if self.roles[ColumnRole.LABEL] in new_cols:
+                self.roles[ColumnRole.LABEL] = ""
 
             # Remove from the other list role
             other_role = (
@@ -131,19 +131,19 @@ class Schema:
 
         new_cols = self._as_list(cols)
 
-        # Handle TARGET role differently (single string)
-        if role == ColumnRole.TARGET:
+        # Handle LABEL role differently (single string)
+        if role == ColumnRole.LABEL:
             if len(new_cols) > 1:
-                raise ValueError("TARGET role can only contain one column")
+                raise ValueError("LABEL role can only contain one column")
             col_to_set = new_cols[0] if new_cols else ""
             # Remove from other roles
             for r in [ColumnRole.NUMERICAL, ColumnRole.CATEGORICAL]:
                 self.roles[r] = [c for c in self.roles[r] if c != col_to_set]
             self.roles[role] = col_to_set
         else:
-            # Remove new_cols from TARGET if present
-            if self.roles[ColumnRole.TARGET] in new_cols:
-                self.roles[ColumnRole.TARGET] = ""
+            # Remove new_cols from LABEL if present
+            if self.roles[ColumnRole.LABEL] in new_cols:
+                self.roles[ColumnRole.LABEL] = ""
 
             # Remove from the other list role
             other_role = (
@@ -174,22 +174,22 @@ class Schema:
         return self.roles[ColumnRole.CATEGORICAL]
 
     @property
-    def target(self) -> str:
-        return self.roles[ColumnRole.TARGET]
+    def label(self) -> str:
+        return self.roles[ColumnRole.LABEL]
 
     @property
     def features(self) -> List[str]:
-        """Dynamically compute FEATURES as NUMERICAL + CATEGORICAL, excluding TARGET."""
-        target_col = self.roles[ColumnRole.TARGET]
+        """Dynamically compute FEATURES as NUMERICAL + CATEGORICAL, excluding LABEL."""
+        label_col = self.roles[ColumnRole.LABEL]
         features_cols = []
 
         # Preserve order: first numerical, then categorical
         for col in self.roles[ColumnRole.NUMERICAL]:
-            if col != target_col:
+            if col != label_col:
                 features_cols.append(col)
 
         for col in self.roles[ColumnRole.CATEGORICAL]:
-            if col != target_col:
+            if col != label_col:
                 features_cols.append(col)
 
         return features_cols
@@ -200,7 +200,7 @@ class Schema:
         missing: List[str] = []
 
         for r, cols in self.roles.items():
-            if r == ColumnRole.TARGET:
+            if r == ColumnRole.LABEL:
                 if cols and cols not in existing_set:
                     missing.append(cols)
                     self.roles[r] = ""

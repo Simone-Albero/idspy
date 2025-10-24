@@ -5,7 +5,7 @@ import torch
 from ......core.step.base import Step
 from ......nn.torch.model.base import BaseModel
 from ......nn.torch.loss.base import BaseLoss
-from ......nn.torch.engine.loops import train_epoch, eval_epoch
+from ......nn.torch.engine.epoch import train_epoch, eval_epoch
 from .... import StepFactory
 
 

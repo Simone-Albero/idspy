@@ -90,7 +90,7 @@ class LoadData(Step):
                 {
                     ColumnRole.NUMERICAL: self.numerical_cols or [],
                     ColumnRole.CATEGORICAL: self.categorical_cols or [],
-                    ColumnRole.TARGET: [self.label_col] if self.label_col else [],
+                    ColumnRole.LABEL: [self.label_col] if self.label_col else [],
                 }
             )
 

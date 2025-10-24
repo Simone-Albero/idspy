@@ -16,14 +16,14 @@ class TensorDataset(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
-        targets: Optional[pd.Series] = None,
+        labels: Optional[pd.Series] = None,
         feature_dtype: torch.dtype = torch.float32,
-        target_dtype: torch.dtype = torch.long,
+        label_dtype: torch.dtype = torch.long,
     ) -> None:
         self.features: torch.Tensor = torch.as_tensor(df.values, dtype=feature_dtype)
-        self.targets: Optional[torch.Tensor] = (
-            torch.as_tensor(targets.values, dtype=target_dtype)
-            if targets is not None
+        self.labels: Optional[torch.Tensor] = (
+            torch.as_tensor(labels.values, dtype=label_dtype)
+            if labels is not None
             else None
         )
 
@@ -32,8 +32,8 @@ class TensorDataset(Dataset):
 
     def __getitem__(self, index: int) -> Sample:
         features = self.features[index]
-        targets = self.targets[index] if self.targets is not None else features
-        return {"features": features, "targets": targets}
+        labels = self.labels[index] if self.labels is not None else features
+        return {"features": features, "targets": labels}
 
 
 class NumericalTensorDataset(TensorDataset):
@@ -45,15 +45,15 @@ class NumericalTensorDataset(TensorDataset):
         self,
         df: pd.DataFrame,
         feature_cols: Sequence[str],
-        target_col: Optional[str] = None,
+        label_col: Optional[str] = None,
     ) -> None:
         df = df[feature_cols]
-        targets = df[target_col] if target_col else None
+        labels = df[label_col] if label_col else None
         super().__init__(
             df,
-            targets,
+            labels,
             feature_dtype=torch.float32,
-            target_dtype=torch.long,
+            label_dtype=torch.long,
         )
 
 
@@ -66,16 +66,16 @@ class CategoricalTensorDataset(TensorDataset):
         self,
         df: pd.DataFrame,
         feature_cols: Sequence[str],
-        target_col: Optional[str] = None,
+        label_col: Optional[str] = None,
     ) -> None:
         df = df[feature_cols]
-        targets = df[target_col] if target_col else None
+        labels = df[label_col] if label_col else None
 
         super().__init__(
             df,
-            targets,
+            labels,
             feature_dtype=torch.long,
-            target_dtype=torch.long,
+            label_dtype=torch.long,
         )
 
 
@@ -89,16 +89,16 @@ class MixedTabularDataset(Dataset):
         df: pd.DataFrame,
         numerical_cols: Sequence[str],
         categorical_cols: Sequence[str],
-        target_col: Optional[str] = None,
+        label_col: Optional[str] = None,
     ) -> None:
-        self.numerical_ds = NumericalTensorDataset(df, numerical_cols, target_col=None)
+        self.numerical_ds = NumericalTensorDataset(df, numerical_cols, label_col=None)
         self.categorical_ds = CategoricalTensorDataset(
-            df, categorical_cols, target_col=None
+            df, categorical_cols, label_col=None
         )
 
-        self.targets: Optional[torch.Tensor] = (
-            torch.as_tensor(df[target_col].values, dtype=torch.long)
-            if target_col
+        self.labels: Optional[torch.Tensor] = (
+            torch.as_tensor(df[label_col].values, dtype=torch.long)
+            if label_col
             else None
         )
 
@@ -112,5 +112,5 @@ class MixedTabularDataset(Dataset):
             "numerical": numerical_sample["features"],
             "categorical": categorical_sample["features"],
         }
-        targets = self.targets[index] if self.targets is not None else features
-        return {"features": features, "targets": targets}
+        labels = self.labels[index] if self.labels is not None else features
+        return {"features": features, "targets": labels}

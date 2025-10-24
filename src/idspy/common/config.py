@@ -1,5 +1,3 @@
-"""Configuration loading utilities using Hydra."""
-
 import os
 from pathlib import Path
 from typing import List, Optional
