@@ -1,9 +1,0 @@
-# @package _global_
-defaults:
-  - override /model: tabular_classifier
-  - override /pipeline: supervised_tab_classifier
-  - override /loss: classification
-  - override /pred_fn: argmax
-  - override /loop: default
-
-experiment_name: supervised_tab_classifier

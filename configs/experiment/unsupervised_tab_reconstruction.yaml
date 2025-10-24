@@ -1,9 +1,0 @@
-# @package _global_
-defaults:
-  - override /model: tabular_autoencoder
-  - override /pipeline: unsupervised_tab_reconstruction
-  - override /loss: tab_reconstruction
-  - override /pred_fn: argmax
-  - override /loop: default
-
-experiment_name: unsupervised_tab_reconstruction
