@@ -72,6 +72,9 @@ class Factory(Generic[T]):
 
         # Extract parameters (everything except '_target_')
         params = {k: v for k, v in config.items() if k != target}
+
+        if not params:
+            return component_class()
         return component_class(**params)
 
     def create_from_list(self, configs: list) -> list[T]:
