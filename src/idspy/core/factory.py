@@ -50,17 +50,17 @@ class Factory(Generic[T]):
         s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", class_name)
         return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
-    def create(self, config: Dict[str, Any], target: str = "_target_") -> T:
+    def create(self, config: Dict[str, Any], name_tag: str = "_target_") -> T:
         """
         Create an instance from configuration.
 
         Returns:
             Instantiated component
         """
-        target = config.get(target)
+        target = config.get(name_tag)
         if not target:
             raise ValueError(
-                f"{self._component_type_name.capitalize()} configuration must contain '_target_' field"
+                f"{self._component_type_name.capitalize()} configuration must contain '{name_tag}' field"
             )
 
         component_class = self._registry.get(target)
@@ -70,8 +70,8 @@ class Factory(Generic[T]):
                 f"Available types: {list(self._registry.keys())}"
             )
 
-        # Extract parameters (everything except '_target_')
-        params = {k: v for k, v in config.items() if k != target}
+        # Extract parameters (everything except 'name_tag')
+        params = {k: v for k, v in config.items() if k != name_tag}
 
         if not params:
             return component_class()
