@@ -39,8 +39,12 @@ class CatTensors(Step):
 
     def compute(self, tensors: List[ModelOutput]) -> Optional[Dict[str, Any]]:
         output = []
-        for tensor in tensors:
-            output.append(tensor[self.section] if self.section else tensor)
+
+        if self.section is not None:
+            for tensor in tensors:
+                output.append(tensor[self.section])
+        else:
+            output = tensors
 
         if isinstance(output[0], torch.Tensor):
             output = torch.cat(output, dim=self.cat_dim)

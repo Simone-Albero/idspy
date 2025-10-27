@@ -8,7 +8,7 @@ from .... import StepFactory
 
 
 @StepFactory.register()
-@Step.needs("model")
+@Step.needs("model", "loss_fn")
 class BuildOptimizer(Step):
     """build an optimizer instance from config and model."""
 
@@ -17,6 +17,7 @@ class BuildOptimizer(Step):
         optimizer_args: Dict[str, Any],
         model_key: str = "model",
         optimizer_key: str = "optimizer",
+        loss_key: Optional[str] = None,
         name: Optional[str] = None,
     ) -> None:
 
@@ -26,11 +27,22 @@ class BuildOptimizer(Step):
             "model": model_key,
             "optimizer": optimizer_key,
         }
+        if loss_key is not None:
+            self.key_map["loss_fn"] = loss_key
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def compute(self, model: torch.nn.Module) -> Optional[Dict[str, Any]]:
+    def compute(
+        self, model: torch.nn.Module, loss_fn: Optional[torch.nn.Module] = None
+    ) -> Optional[Dict[str, Any]]:
         OptimizerClass = getattr(torch.optim, self.optimizer_args._target_)
-        optimizer = OptimizerClass(model.parameters(), **self.optimizer_args._params_)
+
+        params = list(model.parameters())
+        if loss_fn is not None:
+            loss_params = list(loss_fn.parameters())
+            if loss_params:
+                params.extend(loss_params)
+
+        optimizer = OptimizerClass(params, **self.optimizer_args._params_)
         return {"optimizer": optimizer}
