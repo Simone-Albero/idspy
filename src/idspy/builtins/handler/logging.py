@@ -156,8 +156,8 @@ class DataFrameProfiler(BaseHandler):
 
             self.logger.log(
                 self.level,
-                "DATAFRAME target class distribution:\n%s",
-                df.tab.target.value_counts(),
+                "DATAFRAME label class distribution:\n%s",
+                df.tab.label.value_counts(),
             )
 
         except Exception:
