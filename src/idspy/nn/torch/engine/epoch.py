@@ -41,7 +41,7 @@ def eval_epoch(
     losses_list = []
     pbar = tqdm(dataloader, desc="Evaluating", unit="batch")
 
-    for batch in pbar:
+    for i, batch in enumerate(pbar):
         batch = ensure_batch(batch).to(device, non_blocking=True)
         outputs, loss = _forward_and_loss(model, batch, loss_fn)
 
@@ -59,7 +59,7 @@ def eval_epoch(
             profiler.step()
 
         if loss is not None:
-            pbar.set_postfix({"loss": f"{total_loss:.4f}"})
+            pbar.set_postfix({"loss": f"{total_loss/(i + 1):.4f}"})
 
     avg_loss = total_loss / len(dataloader) if dataloader else 0.0
     return avg_loss, losses_list, outputs_list
