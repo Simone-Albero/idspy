@@ -1,8 +1,9 @@
 from typing import Optional, Any, Dict
 import numpy as np
 
-from sklearn.cluster import KMeans
-from sklearn.mixture import GaussianMixture
+from sklearn.cluster import KMeans as KmeansAlgorithm
+from sklearn.mixture import GaussianMixture as GaussianMixtureAlgorithm
+import hdbscan
 
 from .....core.step.base import Step
 from ... import StepFactory
@@ -20,11 +21,11 @@ class KMeans(Step):
         n_init: int = 10,
         max_iter: int = 300,
         data_key: str = "data",
-        output_key: str = "kmeans_model",
+        output_key: str = "kmeans_labels",
         name: Optional[str] = None,
     ) -> None:
         super().__init__(name=name or "compute_kmeans")
-        self.kmeans = KMeans(
+        self.kmeans = KmeansAlgorithm(
             n_clusters=n_clusters,
             init=init,
             n_init=n_init,
@@ -41,13 +42,7 @@ class KMeans(Step):
 
     def compute(self, data: np.ndarray) -> Optional[Dict[str, Any]]:
         self.kmeans.fit(data)
-        output = {
-            "kmeans_model": self.kmeans,
-            "cluster_centers": self.kmeans.cluster_centers_,
-            "labels": self.kmeans.labels_,
-            "inertia": self.kmeans.inertia_,
-        }
-        return {"output": output}
+        return {"output": self.kmeans.labels_}
 
 
 @StepFactory.register()
@@ -61,11 +56,11 @@ class GaussianMixture(Step):
         n_init: int = 10,
         max_iter: int = 300,
         data_key: str = "data",
-        output_key: str = "gm_model",
+        output_key: str = "gm_labels",
         name: Optional[str] = None,
     ) -> None:
         super().__init__(name=name or "compute_gm")
-        self.gm = GaussianMixture(
+        self.gm = GaussianMixtureAlgorithm(
             n_components=n_clusters,
             n_init=n_init,
             max_iter=max_iter,
@@ -81,13 +76,41 @@ class GaussianMixture(Step):
 
     def compute(self, data: np.ndarray) -> Optional[Dict[str, Any]]:
         self.gm.fit(data)
-        output = {
-            "gm_model": self.gm,
-            "means": self.gm.means_,
-            "covariances": self.gm.covariances_,
-            "weights": self.gm.weights_,
-            "labels": self.gm.predict(data),
-            "aic": self.gm.aic(data),
-            "bic": self.gm.bic(data),
+        return {"output": self.gm.predict(data)}
+
+
+@StepFactory.register()
+@Step.needs("data")
+class HDBSCAN(Step):
+    """Compute HDBSCAN clustering on input data."""
+
+    def __init__(
+        self,
+        min_cluster_size: int = 5,
+        min_samples: Optional[int] = None,
+        metric: str = "euclidean",
+        data_key: str = "data",
+        output_key: str = "hdbscan_labels",
+        core_dist_n_jobs: int = 8,
+        name: Optional[str] = None,
+    ) -> None:
+        super().__init__(name=name or "compute_hdbscan")
+        self.hdbscan = hdbscan.HDBSCAN(
+            min_cluster_size=min_cluster_size,
+            min_samples=min_samples,
+            metric=metric,
+            core_dist_n_jobs=core_dist_n_jobs,
+        )
+
+        self.key_map = {
+            "data": data_key,
+            "output": output_key,
         }
-        return {"output": output}
+
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def compute(self, data: np.ndarray) -> Optional[Dict[str, Any]]:
+        self.hdbscan.fit(data)
+        print("HDBSCAN found clusters:", np.unique(self.hdbscan.labels_))
+        return {"output": self.hdbscan.labels_}

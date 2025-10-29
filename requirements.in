@@ -10,3 +10,4 @@ hydra-core
 pyarrow
 tensorboard
 seaborn
+hdbscan

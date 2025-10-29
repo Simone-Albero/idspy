@@ -15,7 +15,6 @@ from sklearn.neighbors import NearestNeighbors
 from ....core.step.base import Step
 from .. import StepFactory
 from ....plot.score import dict_to_table
-from ..helpers import sample_vectors_and_labels
 
 logger = logging.getLogger(__name__)
 
@@ -135,13 +134,11 @@ class ClusteringMetrics(Step):
         labels_key: str = "labels",
         metrics_key: str = "clustering_scores",
         scale_inputs: bool = True,
-        sample_size: int = 10000,
         pca_components: int = 16,
         name: Optional[str] = None,
     ) -> None:
         super().__init__(name=name or "compute_clustering_scores")
         self.scale_inputs = scale_inputs
-        self.sample_size = sample_size
         self.pca_components = pca_components
         self.key_map = {
             "vectors": vectors_key,
@@ -155,17 +152,12 @@ class ClusteringMetrics(Step):
     def compute(
         self, vectors: np.ndarray, labels: np.ndarray
     ) -> Optional[Dict[str, Any]]:
-        X_sampled, labels_sampled = sample_vectors_and_labels(
-            vectors,
-            labels,
-            sample_size=self.sample_size,
-        )
 
         if self.scale_inputs:
             scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X_sampled)
+            X_scaled = scaler.fit_transform(vectors)
         else:
-            X_scaled = X_sampled
+            X_scaled = vectors
 
         if self.pca_components < X_scaled.shape[1]:
             X_compressed = PCA(n_components=self.pca_components).fit_transform(X_scaled)
@@ -180,31 +172,23 @@ class ClusteringMetrics(Step):
 
         # Metrics based on true labels
         logger.info("Computing Silhouette score...")
-        scores["Silhouette"] = silhouette_score(X_compressed, labels_sampled)
+        scores["Silhouette"] = silhouette_score(X_compressed, labels)
 
         logger.info("Computing Calinski-Harabasz score...")
-        scores["Calinski-Harabasz"] = calinski_harabasz_score(
-            X_compressed, labels_sampled
-        )
+        scores["Calinski-Harabasz"] = calinski_harabasz_score(X_compressed, labels)
 
         logger.info("Computing Davies-Bouldin score...")
-        scores["Davies-Bouldin"] = davies_bouldin_score(X_compressed, labels_sampled)
+        scores["Davies-Bouldin"] = davies_bouldin_score(X_compressed, labels)
 
         # Custom metrics
         logger.info("Computing class separation...")
-        scores["Class Separation"] = class_separation_score(
-            X_compressed, labels_sampled
-        )
+        scores["Class Separation"] = class_separation_score(X_compressed, labels)
 
         logger.info("Computing intra-class cohesion...")
-        scores["Intra-class Cohesion"] = intra_class_cohesion(
-            X_compressed, labels_sampled
-        )
+        scores["Intra-class Cohesion"] = intra_class_cohesion(X_compressed, labels)
 
         logger.info("Computing inter-class separation...")
-        scores["Inter-class Separation"] = inter_class_separation(
-            X_compressed, labels_sampled
-        )
+        scores["Inter-class Separation"] = inter_class_separation(X_compressed, labels)
 
         return {
             "outputs": {

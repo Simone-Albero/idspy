@@ -1,9 +1,11 @@
 from typing import Any, Dict, Optional
 
 import pandas as pd
+import numpy as np
 
 from ....core.step.base import Step
 from ....data.tab_accessor import reattach_meta
+from ..helpers import sample_vectors_and_labels
 from .. import StepFactory
 
 
@@ -92,3 +94,44 @@ class Downsample(Step):
             )
 
         return {"df": reattach_meta(df, sampled)}
+
+
+@StepFactory.register()
+@Step.needs("vectors", "labels")
+class SampleVectorsAndLabels(Step):
+
+    def __init__(
+        self,
+        sample_size: int,
+        stratify: bool = True,
+        random_state: Optional[int] = None,
+        vectors_key: str = "data.base_df",
+        labels_key: Optional[str] = None,
+        name: Optional[str] = None,
+    ) -> None:
+        self.sample_size = sample_size
+        self.stratify = stratify
+        self.random_state = random_state
+
+        super().__init__(name=name or "sample_vectors_and_labels")
+        self.key_map = {
+            "vectors": vectors_key,
+        }
+        if labels_key is not None:
+            self.key_map["labels"] = labels_key
+
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def compute(
+        self, vectors: np.ndarray, labels: Optional[np.ndarray] = None
+    ) -> Optional[Dict[str, Any]]:
+
+        vectors, labels = sample_vectors_and_labels(
+            vectors, labels, self.sample_size, self.stratify, self.random_state
+        )
+
+        return {
+            "vectors": vectors,
+            "labels": labels,
+        }

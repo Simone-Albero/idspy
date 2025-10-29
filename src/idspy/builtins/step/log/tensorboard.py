@@ -42,6 +42,7 @@ class MetricsLogger(Step):
         log_dir: str,
         metrics_key: str,
         prefix: Optional[str] = None,
+        secondary_prefix: Optional[str] = None,
         name: Optional[str] = None,
     ) -> None:
         super().__init__(name=name or "tensorboard_logger")
@@ -49,6 +50,11 @@ class MetricsLogger(Step):
         self.writer = SummaryWriter(log_dir=log_dir)
         self.step = 0
         self.prefix = _auto_detect_prefix(metrics_key) if prefix is None else prefix
+        self.prefix = (
+            f"{self.prefix}{self.SEPARATOR}{secondary_prefix}"
+            if secondary_prefix is not None
+            else self.prefix
+        )
         self.key_map = {"metrics": metrics_key}
 
     def bindings(self) -> Dict[str, str]:
