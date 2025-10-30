@@ -1,4 +1,4 @@
-from typing import Any, Sequence, Optional, Callable, Mapping
+from typing import Sequence, Optional, Callable, Tuple
 
 import torch
 from torch import nn
@@ -156,7 +156,7 @@ class TabularDecoder(nn.Module):
             ]
         )
 
-    def forward(self, x: torch.Tensor) -> Mapping[str, Any]:
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, Sequence[torch.Tensor]]:
         """Forward pass.
 
         Args:
@@ -176,7 +176,4 @@ class TabularDecoder(nn.Module):
         # Generate logits for each categorical feature
         reconstructed_cat_logits = [head(decoded_features) for head in self.cat_heads]
 
-        return {
-            "numerical": reconstructed_numerical,
-            "categorical": reconstructed_cat_logits,
-        }
+        return reconstructed_numerical, reconstructed_cat_logits

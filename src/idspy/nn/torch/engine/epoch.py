@@ -15,12 +15,12 @@ def _forward_and_loss(
     loss_fn: Optional[BaseLoss] = None,
 ) -> Tuple[ModelOutput, Optional[torch.Tensor]]:
     """Forward pass with optional loss computation."""
-    outputs = model(batch.features)
+    outputs = model(*batch.features)
 
     if loss_fn is None or batch.targets is None:
         return outputs, None
 
-    loss = loss_fn(*model.for_loss(outputs, batch.targets))
+    loss = loss_fn(*model.for_loss(outputs, *batch.targets))
     return outputs, loss
 
 

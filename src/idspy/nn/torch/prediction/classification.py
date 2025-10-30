@@ -1,9 +1,6 @@
 import torch
 
-from . import PredFactory
 
-
-@PredFactory.register()
 class ArgMax:
 
     def __call__(self, x: torch.Tensor, *args) -> torch.Tensor:

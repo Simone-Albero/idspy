@@ -1,8 +1,7 @@
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 from torch import nn, Tensor
 import torch
-from ....data.torch.batch import Features
 
 
 class ModelOutput(dict):
@@ -43,11 +42,11 @@ class BaseModel(nn.Module):
     Base class for models. Defines the interface for forward and loss_inputs methods.
     """
 
-    def forward(self, features: Features) -> ModelOutput:
+    def forward(self, x: torch.Tensor) -> ModelOutput:
         """
         Forward pass. Must be implemented by subclasses.
         Args:
-            features: Features containing tensors or dictionary-like tensors.
+            x: Input tensor of shape [batch_size, num_features].
         Returns:
             ModelOutput: NamedTuple, expected to contain at least 'logits'.
         """
@@ -56,10 +55,10 @@ class BaseModel(nn.Module):
     def for_loss(
         self,
         output: ModelOutput,
-        targets: Union[Tensor, Features],
+        target: torch.Tensor,
     ) -> Tuple[Tensor, Tensor]:
         """
-        Prepares arguments for the loss function. Default: pred=output['logits'], target=batch.target.
+        Prepares arguments for the loss function. Default: pred=output['logits'].
         Override if your model/loss requires different fields.
         """
-        return output.logits, targets
+        return output.logits, target

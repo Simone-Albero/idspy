@@ -132,20 +132,20 @@ class TabularEncoder(nn.Module):
         )
 
     def forward(
-        self, numerical: torch.Tensor, categorical: torch.Tensor
+        self, x_numerical: torch.Tensor, x_categorical: torch.Tensor
     ) -> torch.Tensor:
         """Forward pass.
 
         Args:
-            numerical: Tensor of shape [batch_size, num_numerical]
-            categorical: Tensor of shape [batch_size, n_cat_features]
+            x_numerical: Tensor of shape [batch_size, num_numerical]
+            x_categorical: Tensor of shape [batch_size, n_cat_features]
 
         Returns:
             Tensor of shape [batch_size, out_features]
         """
-        embedded_cat = self.embedding(categorical)
+        embedded_cat = self.embedding(x_categorical)
 
-        combined = torch.cat([numerical, embedded_cat], dim=1)
+        combined = torch.cat([x_numerical, embedded_cat], dim=1)
         encoded = self.encoder(combined)
 
         return encoded

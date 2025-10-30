@@ -1,4 +1,4 @@
-from typing import Sequence, Optional, Callable
+from typing import Sequence, Optional, Callable, Tuple
 
 import torch
 from torch import nn
@@ -6,12 +6,86 @@ from torch import nn
 from .base import BaseModel, ModelOutput
 from ..module.mlp import MLPBlock
 from ..module.embedding import EmbeddingBlock
-from ....data.torch.batch import Features
 from . import ModelFactory
 
 
+class ModularClassifier(BaseModel):
+    """Generic Classifier base class."""
+
+    def __init__(
+        self, feature_extractor: nn.Module, classifier_head: nn.Module
+    ) -> None:
+        super().__init__()
+        self.feature_extractor = feature_extractor
+        self.classifier_head = classifier_head
+
+    def forward(self, x: torch.Tensor) -> ModelOutput:
+        """Forward pass.
+
+        Args:
+            x: Input tensor of shape [batch_size, features]
+
+        Returns:
+            Model output with 'logits' and 'latents'
+        """
+        latents = self.feature_extractor(x)
+        logits = self.classifier_head(latents)
+        return ModelOutput(logits=logits, latents=latents)
+
+    def for_loss(
+        self,
+        output: ModelOutput,
+        target: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Returns logits and target for loss computation."""
+        return output.logits, target
+
+
+class ModularTabularClassifier(BaseModel):
+    """Generic Classifier base class for tabular data."""
+
+    def __init__(
+        self,
+        embedding_module: nn.Module,
+        feature_extractor: nn.Module,
+        classifier_head: nn.Module,
+    ) -> None:
+        super().__init__()
+        self.embedding_module = embedding_module
+        self.feature_extractor = feature_extractor
+        self.classifier_head = classifier_head
+
+    def forward(
+        self, x_numerical: torch.Tensor, x_categorical: torch.Tensor
+    ) -> ModelOutput:
+        """Forward pass.
+
+        Args:
+            x_numerical: Tensor of shape [batch_size, n_numerical_features]
+            x_categorical: Tensor of shape [batch_size, n_categorical_features]
+
+        Returns:
+            Model output with 'logits' and 'latents'
+        """
+        cat_emb = self.embedding(x_categorical)
+        combined = torch.cat((x_numerical, cat_emb), dim=1)
+
+        latents = self.feature_extractor(combined)
+        logits = self.classifier_head(latents)
+
+        return ModelOutput(logits=logits, latents=latents)
+
+    def for_loss(
+        self,
+        output: ModelOutput,
+        target: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Returns logits and target for loss computation."""
+        return output.logits, target
+
+
 @ModelFactory.register()
-class MLPClassifier(BaseModel):
+class MLPClassifier(ModularClassifier):
     """Two-stage MLP classifier with feature extraction and classification head."""
 
     def __init__(
@@ -24,14 +98,13 @@ class MLPClassifier(BaseModel):
         norm_layer: Optional[Callable[[int], nn.Module]] = None,
         bias: bool = True,
     ) -> None:
-        super().__init__()
         hidden_dims = list(hidden_dims)
 
         # Feature extraction
         feat_dim = hidden_dims[-1] if hidden_dims else in_features
         extractor_dims = hidden_dims[:-1] if len(hidden_dims) > 1 else hidden_dims
 
-        self.feature_extractor = MLPBlock(
+        feature_extractor = MLPBlock(
             in_features=in_features,
             out_features=feat_dim,
             hidden_dims=extractor_dims,
@@ -42,24 +115,15 @@ class MLPClassifier(BaseModel):
         )
 
         # Classification head
-        self.classifier_head = nn.Linear(feat_dim, out_features, bias=bias)
+        classifier_head = nn.Linear(feat_dim, out_features, bias=bias)
 
-    def forward(self, x: Features) -> ModelOutput:
-        """Forward pass.
-
-        Args:
-            x: Features object containing tensor of shape [batch_size, features]
-
-        Returns:
-            Model output with 'logits' and 'latents'
-        """
-        latents = self.feature_extractor(x)
-        logits = self.classifier_head(latents)
-        return ModelOutput(logits=logits, latents=latents)
+        super().__init__(
+            feature_extractor=feature_extractor, classifier_head=classifier_head
+        )
 
 
 @ModelFactory.register()
-class TabularClassifier(MLPClassifier):
+class TabularClassifier(ModularTabularClassifier):
     """Classifier for mixed tabular data (numerical + categorical features)."""
 
     def __init__(
@@ -75,39 +139,34 @@ class TabularClassifier(MLPClassifier):
         norm_layer: Optional[Callable[[int], nn.Module]] = None,
         bias: bool = True,
     ) -> None:
-        embedding = EmbeddingBlock(
+        hidden_dims = list(hidden_dims)
+
+        self.embedding = EmbeddingBlock(
             num_categorical, cat_cardinalities, max_emb_dim=max_emb_dim
         )
-        emb_dim_total = sum(embedding.embedding_dims)
+        emb_dim_total = sum(self.embedding.embedding_dims)
 
         in_features = num_numerical + emb_dim_total
-        super().__init__(
+
+        # Feature extraction
+        feat_dim = hidden_dims[-1] if hidden_dims else in_features
+        extractor_dims = hidden_dims[:-1] if len(hidden_dims) > 1 else hidden_dims
+
+        feature_extractor = MLPBlock(
             in_features=in_features,
-            out_features=out_features,
-            hidden_dims=hidden_dims,
-            dropout=dropout,
+            out_features=feat_dim,
+            hidden_dims=extractor_dims,
             activation=activation,
             norm_layer=norm_layer,
+            dropout=dropout,
             bias=bias,
         )
-        self.embedding = embedding
 
-    def forward(self, x: Features) -> ModelOutput:
-        """Forward pass.
+        # Classification head
+        classifier_head = nn.Linear(feat_dim, out_features, bias=bias)
 
-        Args:
-            x: Features object containing dict with 'numerical' and 'categorical' keys
-
-        Returns:
-            Model output with 'logits' and 'latents'
-        """
-        x_num = x["numerical"]
-        x_cat = x["categorical"]
-
-        cat_emb = self.embedding(x_cat)
-        combined = torch.cat((x_num, cat_emb), dim=1)
-
-        latents = self.feature_extractor(combined)
-        logits = self.classifier_head(latents)
-
-        return ModelOutput(logits=logits, latents=latents)
+        super().__init__(
+            embedding_module=self.embedding,
+            feature_extractor=feature_extractor,
+            classifier_head=classifier_head,
+        )

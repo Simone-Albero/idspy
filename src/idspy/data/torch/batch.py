@@ -1,10 +1,9 @@
 from dataclasses import dataclass
-from typing import Mapping, Optional, Union, Any, Dict
+from typing import Optional, Any, Dict, List
+
 import torch
-from torch import Tensor
 
-
-Features = Union[Tensor, Mapping[str, Tensor]]
+from .dataset import Sample
 
 
 def _map_tensors(x: Any, fn) -> Any:
@@ -13,8 +12,6 @@ def _map_tensors(x: Any, fn) -> Any:
     """
     if torch.is_tensor(x):
         return fn(x)
-    if isinstance(x, Mapping):
-        return {k: _map_tensors(v, fn) for k, v in x.items()}
     if isinstance(x, (list, tuple)):
         t = type(x)
         return t(_map_tensors(v, fn) for v in x)
@@ -24,26 +21,23 @@ def _map_tensors(x: Any, fn) -> Any:
 @dataclass(frozen=True)
 class Batch:
     """
-    Container for model features and targets.
+    Container for model features and ground truth.
+    Features and Targets are always lists of tensors.
     """
 
-    features: Features
-    targets: Optional[Features] = None
+    features: List[torch.Tensor]
+    targets: Optional[List[torch.Tensor]] = None
 
     def to(self, device: torch.device, non_blocking: bool = True) -> "Batch":
         """
         Move all tensors in the batch to the specified device.
         """
         return Batch(
-            features=_map_tensors(
-                self.features, lambda t: t.to(device, non_blocking=non_blocking)
-            ),
+            features=[t.to(device, non_blocking=non_blocking) for t in self.features],
             targets=(
                 None
                 if self.targets is None
-                else _map_tensors(
-                    self.targets, lambda t: t.to(device, non_blocking=non_blocking)
-                )
+                else [t.to(device, non_blocking=non_blocking) for t in self.targets]
             ),
         )
 
@@ -52,75 +46,85 @@ class Batch:
         Detach all tensors in the batch from the computation graph.
         """
         return Batch(
-            features=_map_tensors(self.features, lambda t: t.detach()),
-            targets=None if self.targets is None else self.targets.detach(),
+            features=[t.detach() for t in self.features],
+            targets=(
+                None if self.targets is None else [t.detach() for t in self.targets]
+            ),
         )
 
     def as_dict(self) -> Dict[str, Any]:
         """
         Return the batch as a dictionary.
         """
-        return {"features": self.features, "targets": self.targets}
+        return {"samples": self.features, "ground_truth": self.targets}
 
     def __getitem__(self, key: str) -> Any:
         """
-        Get an item from the batch by key ('features' or 'targets').
+        Get an item from the batch by key ('samples' or 'ground_truth').
         """
-        if key == "features":
+        if key == "samples":
             return self.features
-        if key == "targets":
+        if key == "ground_truth":
             return self.targets
         raise KeyError(key)
 
     def __iter__(self):
         """
-        Iterate over batch keys ('features', 'target').
+        Iterate over batch keys ('samples', 'ground_truth').
         """
-        yield "features"
-        yield "target"
+        yield "samples"
+        yield "ground_truth"
 
 
-def ensure_batch(x: Batch | Mapping[str, Any]) -> Batch:
+def ensure_batch(x: Batch | Sample) -> Batch:
     """
     Ensure the input is a Batch instance.
     """
     if isinstance(x, Batch):
         return x
 
-    return Batch(features=x["features"], targets=x.get("targets"))
+    return default_collate(x)
 
 
-def default_collate(samples: list[Mapping[str, Any]]) -> Batch:
+def _stack_samples(samples_list: List[Sample], index: int) -> List[torch.Tensor]:
     """
-    Collate a list of supervised samples into a Batch.
+    Stack a group of tensors from samples.
+
+    Args:
+        samples_list: List of samples from the dataset
+        index: Index to extract (0 for features, 1 for labels)
+
+    Returns:
+        List of stacked tensors, one per feature/label group
     """
-    first_features = samples[0]["features"]
+    first_group = samples_list[0][index]
 
-    def stack(ts: list[Tensor]) -> Tensor:
-        return torch.stack(ts, 0)
+    # Case 1: Group is a list of tensors (e.g., MixedTabularDataset)
+    if isinstance(first_group, list):
+        num_groups = len(first_group)
+        return [
+            torch.stack([s[index][i] for s in samples_list], dim=0)
+            for i in range(num_groups)
+        ]
 
-    if isinstance(first_features, Mapping):
-        keys = list(first_features.keys())
-        feature_lists = {k: [] for k in keys}
-        for s in samples:
-            for k in keys:
-                feature_lists[k].append(s["features"][k])
-        features = {k: stack(feature_lists[k]) for k in keys}
-    else:
-        feature_list = [s["features"] for s in samples]
-        features = stack(feature_list)
+    # Case 2: Group is a single tensor (e.g., TensorDataset)
+    return [torch.stack([s[index] for s in samples_list], dim=0)]
 
+
+def default_collate(samples_list: List[Sample]) -> Batch:
+    """
+    Collate a list of samples into a Batch.
+    Handles both single-tensor and multi-tensor features.
+    """
+    # Stack features
+    samples = _stack_samples(samples_list, index=0)
+
+    # Stack ground truth
     targets = None
-    if "targets" in samples[0] and samples[0]["targets"] is not None:
-        first_targets = samples[0]["targets"]
-        if isinstance(first_targets, Mapping):
-            keys = list(first_targets.keys())
-            target_lists = {k: [] for k in keys}
-            for s in samples:
-                for k in keys:
-                    target_lists[k].append(s["targets"][k])
-            targets = {k: stack(target_lists[k]) for k in keys}
-        else:
-            targets = stack([s["targets"] for s in samples]).view(-1)
+    if samples_list[0][1] is not None:
+        targets = _stack_samples(samples_list, index=1)
 
-    return Batch(features=features, targets=targets)
+    return Batch(
+        features=samples,
+        targets=targets,
+    )

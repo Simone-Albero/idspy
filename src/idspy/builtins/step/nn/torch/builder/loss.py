@@ -15,6 +15,7 @@ class BuildLoss(Step):
 
     def __init__(
         self,
+        loss_name: str,
         loss_args: Dict[str, Any],
         loss_key: str = "loss_fn",
         reduction: Optional[str] = None,
@@ -22,6 +23,7 @@ class BuildLoss(Step):
     ) -> None:
 
         super().__init__(name=name or "build_loss")
+        self.loss_name = loss_name
         self.loss_args = loss_args
         self.reduction = reduction
         self.key_map = {
@@ -32,7 +34,7 @@ class BuildLoss(Step):
         return self.key_map
 
     def compute(self, device: torch.device) -> Optional[Dict[str, Any]]:
-        loss = LossFactory.create(self.loss_args).to(device)
+        loss = LossFactory.create(self.loss_name, self.loss_args).to(device)
         if self.reduction is not None:
             loss.reduction = self.reduction
 

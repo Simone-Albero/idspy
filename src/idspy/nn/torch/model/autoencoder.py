@@ -1,4 +1,4 @@
-from typing import Sequence, Optional, Callable, Union, Tuple
+from typing import Sequence, Optional, Callable, Tuple
 
 import torch
 from torch import nn
@@ -6,49 +6,81 @@ from torch import nn
 from .base import BaseModel, ModelOutput
 from ..module.encoder import NumericalEncoder, CategoricalEncoder, TabularEncoder
 from ..module.decoder import NumericalDecoder, CategoricalDecoder, TabularDecoder
-from ....data.torch.batch import Features
 from . import ModelFactory
 
 
-@ModelFactory.register()
-class Autoencoder(BaseModel):
+class ModularAutoencoder(BaseModel):
+    """Generic Autoencoder with custom encoder and decoder."""
 
-    def __init__(self, encoder: nn.Module, decoder: nn.Module) -> None:
+    def __init__(
+        self,
+        encoder: nn.Module,
+        decoder: nn.Module,
+    ) -> None:
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
 
-    def forward(self, x: Features) -> ModelOutput:
+    def forward(self, x: torch.Tensor) -> ModelOutput:
         """Forward pass.
         Args:
-            x: Features object containing tensors or dictionary-like tensors.
+            x: Input tensor
         Returns:
             Model output with 'decoded' and 'latents'
         """
-        encoded = self.encoder(**x)
+        encoded = self.encoder(x)
         decoded = self.decoder(encoded)
         return ModelOutput(decoded=decoded, latents=encoded)
-
-    def get_latent(self, x: Features) -> ModelOutput:
-        """Get latent representation from encoder.
-        Args:
-            x: Features object containing tensors or dictionary-like tensors.
-        Returns:
-            Model output with 'latents'
-        """
-        encoded = self.encoder(**x)
-        return ModelOutput(latents=encoded)
 
     def for_loss(
         self,
         output: ModelOutput,
-        targets: Union[torch.Tensor, Features],
+        target: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """returns reconstructed features and targets for loss computation."""
-        return output["decoded"], targets
+        return output["decoded"], target
 
 
-class NumericalAutoencoder(Autoencoder):
+class ModularTabularAutoencoder(BaseModel):
+    """Generic Tabular Autoencoder with custom encoder and decoder."""
+
+    def __init__(
+        self,
+        encoder: nn.Module,
+        decoder: nn.Module,
+    ) -> None:
+        super().__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+
+    def forward(
+        self, x_numerical: torch.Tensor, x_categorical: torch.Tensor
+    ) -> ModelOutput:
+        """Forward pass.
+        Args:
+            x_numerical: Tensor of shape [batch_size, n_numerical_features]
+            x_categorical: Tensor of shape [batch_size, n_categorical_features]
+        Returns:
+            Model output with 'decoded' and 'latents'
+        """
+        encoded = self.encoder(x_numerical, x_categorical)
+        decoded = self.decoder(encoded)
+        return ModelOutput(decoded=decoded, latents=encoded)
+
+    def for_loss(
+        self,
+        output: ModelOutput,
+        numerical_target: torch.Tensor,
+        categorical_target: Sequence[torch.Tensor],
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """returns reconstructed features and targets for loss computation."""
+        recon_numerical, recon_categorical = output["decoded"]
+
+        return recon_numerical, recon_categorical, numerical_target, categorical_target
+
+
+@ModelFactory.register()
+class NumericalAutoencoder(ModularAutoencoder):
 
     def __init__(
         self,
@@ -82,11 +114,11 @@ class NumericalAutoencoder(Autoencoder):
             bias=bias,
         )
 
-        super().__init__(encoder, decoder)
+        super().__init__(encoder=encoder, decoder=decoder)
 
 
 @ModelFactory.register()
-class CategoricalAutoencoder(Autoencoder):
+class CategoricalAutoencoder(ModularAutoencoder):
     def __init__(
         self,
         embed_dim: int,
@@ -127,11 +159,11 @@ class CategoricalAutoencoder(Autoencoder):
             bias=bias,
         )
 
-        super().__init__(encoder, decoder)
+        super().__init__(encoder=encoder, decoder=decoder)
 
 
 @ModelFactory.register()
-class TabularAutoencoder(Autoencoder):
+class TabularAutoencoder(ModularTabularAutoencoder):
 
     def __init__(
         self,
@@ -174,17 +206,4 @@ class TabularAutoencoder(Autoencoder):
             bias=bias,
         )
 
-        super().__init__(encoder, decoder)
-
-    def for_loss(
-        self,
-        output: ModelOutput,
-        targets: Features,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """returns reconstructed features and targets for loss computation."""
-        return (
-            output["decoded"]["numerical"],
-            output["decoded"]["categorical"],
-            targets["numerical"],
-            targets["categorical"],
-        )
+        super().__init__(encoder=encoder, decoder=decoder)

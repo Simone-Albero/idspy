@@ -14,6 +14,7 @@ class BuildScheduler(Step):
 
     def __init__(
         self,
+        scheduler_name: str,
         scheduler_args: Dict[str, Any],
         optimizer_key: str = "optimizer",
         scheduler_key: str = "scheduler",
@@ -22,6 +23,7 @@ class BuildScheduler(Step):
     ) -> None:
 
         super().__init__(name=name or "build_scheduler")
+        self.scheduler_name = scheduler_name
         self.scheduler_args = scheduler_args
         self.key_map = {
             "optimizer": optimizer_key,
@@ -35,11 +37,11 @@ class BuildScheduler(Step):
     def compute(
         self, optimizer: torch.optim.Optimizer, dataloader: torch.utils.data.DataLoader
     ) -> Optional[Dict[str, Any]]:
-        SchedulerClass = getattr(torch.optim.lr_scheduler, self.scheduler_args._target_)
+        SchedulerClass = getattr(torch.optim.lr_scheduler, self.scheduler_name)
 
-        if self.scheduler_args._params_.steps_per_epoch == "auto":
+        if self.scheduler_args.steps_per_epoch == "auto":
             steps_per_epoch = len(dataloader)
-            self.scheduler_args._params_.steps_per_epoch = steps_per_epoch
+            self.scheduler_args.steps_per_epoch = steps_per_epoch
 
-        scheduler = SchedulerClass(optimizer, **self.scheduler_args._params_)
+        scheduler = SchedulerClass(optimizer, **self.scheduler_args)
         return {"scheduler": scheduler}

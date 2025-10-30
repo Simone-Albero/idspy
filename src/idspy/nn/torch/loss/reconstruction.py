@@ -28,18 +28,18 @@ class NumericalReconstructionLoss(BaseLoss):
 
     def forward(
         self,
-        out: Tensor,
+        x: Tensor,
         target: Tensor,
     ) -> Tensor:
         """Compute reconstruction loss.
 
         Args:
-            out: Reconstructed features [batch_size, num_features]
+            x: Reconstructed features [batch_size, num_features]
             target: Original features [batch_size, num_features]
         Returns:
             Loss tensor (scalar or per-sample based on reduction)
         """
-        loss = F.mse_loss(out, target, reduction="none")
+        loss = F.mse_loss(x, target, reduction="none")
         loss = loss.mean(dim=-1)  # Average over features
         return self._reduce(loss)
 
@@ -61,20 +61,19 @@ class CategoricalReconstructionLoss(BaseLoss):
 
     def _compute_loss_per_feature(
         self,
-        recon: Tensor,
+        x: Tensor,
         targets: Tensor,
     ) -> Tensor:
         """Compute loss per categorical feature.
         Args:
-            recon: List of logits tensors, one per categorical feature.
-                   Each tensor has shape [batch_size, cardinality]
+            x: List of logits tensors, one per categorical feature. Each tensor has shape [batch_size, cardinality]
             targets: Tensor of shape [batch_size, n_cat_features] with true class indices
         Returns:
             Tensor of shape [batch_size, n_cat_features] with per-feature losses
         """
 
         losses = []
-        for i, feat_logits in enumerate(recon):
+        for i, feat_logits in enumerate(x):
             losses.append(
                 F.cross_entropy(
                     feat_logits,
@@ -87,20 +86,19 @@ class CategoricalReconstructionLoss(BaseLoss):
 
     def forward(
         self,
-        out: Tensor,
+        x: Tensor,
         target: Tensor,
     ) -> Tensor:
         """Compute categorical reconstruction loss.
 
         Args:
-            out: List of logits tensors, one per categorical feature.
-                 Each tensor has shape [batch_size, cardinality]
+            x: List of logits tensors, one per categorical feature. Each tensor has shape [batch_size, cardinality]
             target: Tensor of shape [batch_size, n_cat_features] with true class indices
 
         Returns:
             Loss tensor (scalar or per-sample based on reduction)
         """
-        loss = self._compute_loss_per_feature(out, target)
+        loss = self._compute_loss_per_feature(x, target)
         loss = loss.mean(dim=-1)  # Average over features
         return self._reduce(loss)
 
@@ -148,24 +146,24 @@ class TabularReconstructionLoss(BaseLoss):
 
     def forward(
         self,
-        out_numerical: Tensor,
-        out_categorical: List[Tensor],
+        x_numerical: Tensor,
+        x_categorical: List[Tensor],
         target_numerical: Tensor,
         target_categorical: Tensor,
     ) -> Tensor:
         """Compute combined reconstruction loss with uncertainty-based weighting.
 
         Args:
-            out_numerical: Reconstructed numerical features [batch_size, num_numerical]
-            out_categorical: List of logits tensors for each categorical feature
+            x_numerical: Reconstructed numerical features [batch_size, num_numerical]
+            x_categorical: List of logits tensors for each categorical feature
             target_numerical: Original numerical features [batch_size, num_numerical]
             target_categorical: Original categorical features [batch_size, n_cat_features]
 
         Returns:
             Weighted combination of numeric and categorical losses with uncertainty regularization
         """
-        numerical_loss = self.numerical_loss(out_numerical, target_numerical)
-        categorical_loss = self.categorical_loss(out_categorical, target_categorical)
+        numerical_loss = self.numerical_loss(x_numerical, target_numerical)
+        categorical_loss = self.categorical_loss(x_categorical, target_categorical)
 
         # Clamp sigmas to prevent collapse or explosion
         numerical_sigma = torch.clamp(

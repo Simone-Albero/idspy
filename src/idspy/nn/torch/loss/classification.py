@@ -41,13 +41,13 @@ class ClassificationLoss(BaseLoss):
 
     def forward(
         self,
-        out: Tensor,
+        x: Tensor,
         target: Tensor,
     ) -> Tensor:
         """Compute cross-entropy loss.
 
         Args:
-            out: Logits tensor [batch_size, num_classes]
+            x: Logits tensor [batch_size, num_classes]
             target: Target class indices [batch_size]
 
         Returns:
@@ -56,7 +56,7 @@ class ClassificationLoss(BaseLoss):
         class_weight = self.class_weight
 
         loss = F.cross_entropy(
-            out,
+            x,
             target,
             weight=class_weight,
             ignore_index=self.ignore_index,

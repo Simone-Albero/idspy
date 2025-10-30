@@ -14,6 +14,7 @@ class BuildOptimizer(Step):
 
     def __init__(
         self,
+        optimizer_name: str,
         optimizer_args: Dict[str, Any],
         model_key: str = "model",
         optimizer_key: str = "optimizer",
@@ -22,6 +23,7 @@ class BuildOptimizer(Step):
     ) -> None:
 
         super().__init__(name=name or "build_model")
+        self.optimizer_name = optimizer_name
         self.optimizer_args = optimizer_args
         self.key_map = {
             "model": model_key,
@@ -36,7 +38,7 @@ class BuildOptimizer(Step):
     def compute(
         self, model: torch.nn.Module, loss_fn: Optional[torch.nn.Module] = None
     ) -> Optional[Dict[str, Any]]:
-        OptimizerClass = getattr(torch.optim, self.optimizer_args._target_)
+        OptimizerClass = getattr(torch.optim, self.optimizer_name)
 
         params = list(model.parameters())
         if loss_fn is not None:
@@ -44,5 +46,5 @@ class BuildOptimizer(Step):
             if loss_params:
                 params.extend(loss_params)
 
-        optimizer = OptimizerClass(params, **self.optimizer_args._params_)
+        optimizer = OptimizerClass(params, **self.optimizer_args)
         return {"optimizer": optimizer}

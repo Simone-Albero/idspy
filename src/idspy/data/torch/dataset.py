@@ -1,11 +1,13 @@
-from typing import Mapping, Optional, Sequence
+from typing import Tuple, Optional, Sequence, List, Union
 
 import pandas as pd
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 
 
-Sample = Mapping[str, torch.Tensor]
+TensorGroup = Union[List[torch.Tensor], torch.Tensor]
+Sample = Tuple[TensorGroup, Optional[TensorGroup]]
 
 
 class TensorDataset(Dataset):
@@ -15,14 +17,19 @@ class TensorDataset(Dataset):
 
     def __init__(
         self,
-        df: pd.DataFrame,
-        labels: Optional[pd.Series] = None,
+        data: Union[pd.DataFrame, np.ndarray],
+        labels: Optional[Union[pd.Series, np.ndarray]] = None,
         feature_dtype: torch.dtype = torch.float32,
         label_dtype: torch.dtype = torch.long,
     ) -> None:
-        self.features: torch.Tensor = torch.as_tensor(df.values, dtype=feature_dtype)
+        self.features: torch.Tensor = torch.as_tensor(
+            data.values if isinstance(data, pd.DataFrame) else data, dtype=feature_dtype
+        )
         self.labels: Optional[torch.Tensor] = (
-            torch.as_tensor(labels.values, dtype=label_dtype)
+            torch.as_tensor(
+                labels.values if isinstance(labels, pd.Series) else labels,
+                dtype=label_dtype,
+            )
             if labels is not None
             else None
         )
@@ -33,7 +40,7 @@ class TensorDataset(Dataset):
     def __getitem__(self, index: int) -> Sample:
         features = self.features[index]
         labels = self.labels[index] if self.labels is not None else features
-        return {"features": features, "targets": labels}
+        return features, labels
 
 
 class NumericalTensorDataset(TensorDataset):
@@ -108,9 +115,6 @@ class MixedTabularDataset(Dataset):
     def __getitem__(self, index: int) -> Sample:
         numerical_sample = self.numerical_ds[index]
         categorical_sample = self.categorical_ds[index]
-        features = {
-            "numerical": numerical_sample["features"],
-            "categorical": categorical_sample["features"],
-        }
+        features = [numerical_sample, categorical_sample]
         labels = self.labels[index] if self.labels is not None else features
-        return {"features": features, "targets": labels}
+        return features, labels
