@@ -3,7 +3,6 @@ from typing import Any, Callable, Dict, Optional
 import torch
 
 from ......core.step.base import Step
-from ......nn.torch.engine.forward import make_predictions
 from .... import StepFactory
 
 
@@ -16,7 +15,8 @@ class MakePredictions(Step):
         self,
         pred_fn: Callable,
         logits_key: str = "logits",
-        outputs_key: str = "outputs",
+        prediction_key: str = "predictions",
+        confidences_key: str = "confidences",
         labels_key: Optional[str] = None,
         name: Optional[str] = None,
     ) -> None:
@@ -24,7 +24,8 @@ class MakePredictions(Step):
         self.pred_fn = pred_fn
         self.key_map = {
             "logits": logits_key,
-            "outputs": outputs_key,
+            "predictions": prediction_key,
+            "confidences": confidences_key,
         }
 
         if labels_key is not None:
@@ -38,7 +39,8 @@ class MakePredictions(Step):
         logits: torch.Tensor,
         labels: Optional[torch.Tensor] = None,
     ) -> Optional[Dict[str, Any]]:
-        predictions = (
-            make_predictions(self.pred_fn, logits, labels).detach().cpu().numpy()
+        predictions = self.pred_fn(logits, labels).detach().cpu().numpy()
+        confidence_scores = (
+            self.pred_fn.confidence_scores(logits, labels).detach().cpu().numpy()
         )
-        return {"outputs": predictions}
+        return {"predictions": predictions, "confidences": confidence_scores}

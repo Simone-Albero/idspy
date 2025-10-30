@@ -13,8 +13,8 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.neighbors import NearestNeighbors
 
 from ....core.step.base import Step
+from ....plot.dict import dict_to_table
 from .. import StepFactory
-from ....plot.score import dict_to_table
 
 logger = logging.getLogger(__name__)
 
