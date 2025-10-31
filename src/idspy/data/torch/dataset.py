@@ -113,8 +113,8 @@ class MixedTabularDataset(Dataset):
         return len(self.numerical_ds)
 
     def __getitem__(self, index: int) -> Sample:
-        numerical_sample = self.numerical_ds[index]
-        categorical_sample = self.categorical_ds[index]
+        numerical_sample = self.numerical_ds[index][0]
+        categorical_sample = self.categorical_ds[index][0]
         features = [numerical_sample, categorical_sample]
         labels = self.labels[index] if self.labels is not None else features
         return features, labels
