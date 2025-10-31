@@ -19,11 +19,9 @@ class VectorsProjectionPlot(Step):
         labels_key: str = "labels",
         output_key: str = "projection_plot",
         n_components: int = 2,
-        class_names: Optional[list] = None,
     ) -> None:
 
         super().__init__(name=name or "vectors_projection")
-        self.class_names = class_names
         self.n_components = n_components
         self.key_map = {
             "vectors": vectors_key,

@@ -21,11 +21,9 @@ class SupervisedClassificationMetrics(Step):
         confidences_key: str = "confidences",
         labels_key: str = "labels",
         metrics_key: str = "classification_metrics",
-        class_names: Optional[list] = None,
     ) -> None:
 
         super().__init__(name=name or "classification_metrics")
-        self.class_names = class_names
         self.key_map = {
             "predictions": predictions_key,
             "confidences": confidences_key,
@@ -61,12 +59,13 @@ class SupervisedClassificationMetrics(Step):
 
         class_metrics = {}
 
-        f1_per_class = f1_score(y_true, y_pred, average=None, zero_division=0).tolist()
-        class_names = (
-            [str(i) for i in range(len(f1_per_class))]
-            if self.class_names is None
-            else self.class_names
-        )
+        unique_classes = np.unique(np.concatenate([y_true, y_pred]))
+
+        f1_per_class = f1_score(
+            y_true, y_pred, average=None, labels=unique_classes, zero_division=0
+        ).tolist()
+
+        class_names = [str(i) for i in unique_classes]
 
         for class_name, f1 in zip(class_names, f1_per_class):
             class_metrics[f"f1_{class_name}"] = f1

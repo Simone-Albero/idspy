@@ -83,13 +83,12 @@ def confusion_matrix_to_plot(
     return fig
 
 
-def vectors_plot(
-    vectors: np.ndarray, colors: list | np.ndarray | None = None
-) -> plt.Figure:
-    """Plot 2D or 3D vectors with optional color coding.
+def vectors_plot(vectors: np.ndarray, colors: list | np.ndarray) -> plt.Figure:
+    """Plot 2D or 3D vectors with color coding.
 
     Args:
         vectors (np.ndarray): Array of shape (n_samples, n_features) where n_features is 2 or 3.
+        colors (list | np.ndarray): Array of integer labels for color coding.
     """
     if vectors.ndim != 2 or vectors.shape[1] not in (2, 3):
         raise ValueError(
@@ -102,8 +101,9 @@ def vectors_plot(
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d" if is_3d else None)
 
-    # Prepare color argument
-    color_arg = colors if colors is not None and len(colors) > 0 else "b"
+    # Convert colors to numpy array for easier handling
+    colors_array = np.asarray(colors)
+    unique_labels = np.unique(colors_array)
 
     # Create scatter plot
     if is_3d:
@@ -111,7 +111,7 @@ def vectors_plot(
             vectors[:, 0],
             vectors[:, 1],
             vectors[:, 2],
-            c=color_arg,
+            c=colors_array,
             cmap="tab10",
             s=50,
             alpha=0.7,
@@ -121,7 +121,7 @@ def vectors_plot(
         scatter = ax.scatter(
             vectors[:, 0],
             vectors[:, 1],
-            c=color_arg,
+            c=colors_array,
             cmap="tab10",
             s=50,
             alpha=0.7,
@@ -132,10 +132,26 @@ def vectors_plot(
     ax.set_ylabel("Y")
     ax.set_title(f"{n_features}D Vector Plot")
 
-    # Add legend if colors are provided
-    if colors is not None and len(colors) > 0:
-        legend = ax.legend(*scatter.legend_elements(), title="Classes")
-        legend.set_draggable(True)
+    # Add legend with correct label-color correspondence
+    handles = []
+    for label in unique_labels:
+        # Get the color for this label from the colormap
+        color_idx = label % 10  # tab10 has 10 colors
+        color = plt.cm.tab10(color_idx / 10.0)
+        handles.append(
+            plt.Line2D(
+                [0],
+                [0],
+                marker="o",
+                color="w",
+                markerfacecolor=color,
+                markersize=8,
+                label=f"Class {int(label)}",
+            )
+        )
+
+    legend = ax.legend(handles=handles, title="Classes", loc="best")
+    legend.set_draggable(True)
 
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
