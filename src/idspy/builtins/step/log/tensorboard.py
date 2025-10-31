@@ -25,7 +25,7 @@ def _to_cpu_flat(x: torch.Tensor) -> torch.Tensor:
 
 
 @StepFactory.register()
-@Step.needs("metrics")
+@Step.needs("subject")
 class Logger(Step):
     """Log metrics to TensorBoard."""
 
@@ -34,7 +34,7 @@ class Logger(Step):
     def __init__(
         self,
         log_dir: str,
-        metrics_key: str,
+        subject_key: str,
         prefix: Optional[str] = None,
         secondary_prefix: Optional[str] = None,
         name: Optional[str] = None,
@@ -43,13 +43,13 @@ class Logger(Step):
         self.log_dir = log_dir
         self.writer = SummaryWriter(log_dir=log_dir)
         self.step = 0
-        self.prefix = _auto_detect_prefix(metrics_key) if prefix is None else prefix
+        self.prefix = _auto_detect_prefix(subject_key) if prefix is None else prefix
         self.prefix = (
             f"{self.prefix}{self.SEPARATOR}{secondary_prefix}"
             if secondary_prefix is not None
             else self.prefix
         )
-        self.key_map = {"metrics": metrics_key}
+        self.key_map = {"subject": subject_key}
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
@@ -88,8 +88,8 @@ class Logger(Step):
                     f"Unsupported metric type for {metric_name}: {type(value)}"
                 )
 
-    def compute(self, metrics: Dict[str, float]) -> Optional[Dict[str, Any]]:
-        for key, value in metrics.items():
+    def compute(self, subject: Dict[str, float]) -> Optional[Dict[str, Any]]:
+        for key, value in subject.items():
             self._log_metric(key, value, self.step)
         self.writer.flush()
         self.step += 1
