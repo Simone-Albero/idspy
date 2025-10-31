@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.manifold import TSNE
 
 from ....core.step.base import Step
-from ....plot.vectors import vectors_plot
+from ....plot.array import vectors_plot
 from .. import StepFactory
 
 
