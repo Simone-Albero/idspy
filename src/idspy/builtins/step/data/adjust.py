@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, Union
 
 import numpy as np
 import pandas as pd
@@ -116,14 +116,14 @@ class Log1p(Step):
 
 @StepFactory.register()
 @Step.needs("df")
-class ColsToNumpy(Step):
+class DFToNumpy(Step):
     """Convert specified columns of a DataFrame to a NumPy array."""
 
     def __init__(
         self,
         df_key: str = "test.data",
         output_key: str = "test.labels",
-        cols: Optional[list] = None,
+        cols: Optional[Union[str, List[str]]] = None,
         name: Optional[str] = None,
     ) -> None:
         super().__init__(name=name or "to_numpy")
@@ -138,8 +138,8 @@ class ColsToNumpy(Step):
 
     def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         if self.cols is not None:
-            if len(self.cols) == 1:
-                return {"output": df[self.cols[0]].values}
+            if isinstance(self.cols, str):
+                return {"output": df[self.cols].values}
 
             return {"output": df[self.cols].values}
 
