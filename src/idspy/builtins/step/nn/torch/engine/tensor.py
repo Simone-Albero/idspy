@@ -77,3 +77,26 @@ class ToTensor(Step):
     def compute(self, array: np.ndarray) -> Optional[Dict[str, Any]]:
         tensor = torch.from_numpy(array)
         return {"output": tensor}
+
+
+@StepFactory.register()
+@Step.needs("tensor")
+class ToArray(Step):
+    def __init__(
+        self,
+        tensor_key: str = "tensor",
+        output_key: str = "array",
+        name: Optional[str] = None,
+    ) -> None:
+        super().__init__(name=name or "to_array")
+        self.key_map = {
+            "tensor": tensor_key,
+            "output": output_key,
+        }
+
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def compute(self, tensor: torch.Tensor) -> Optional[Dict[str, Any]]:
+        array = tensor.detach().cpu().numpy()
+        return {"output": array}
