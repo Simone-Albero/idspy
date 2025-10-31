@@ -11,7 +11,7 @@ from .... import StepFactory
 @StepFactory.register()
 @Step.needs("tensors")
 class CatTensors(Step):
-    """Stack model outputs into a single tensor."""
+    """Concatenate a list of tensors along a specified dimension."""
 
     def __init__(
         self,
@@ -20,13 +20,11 @@ class CatTensors(Step):
         to_cpu: bool = False,
         to_numpy: bool = False,
         cat_dim: int = 0,
-        section: Optional[str] = None,
         name: Optional[str] = None,
     ) -> None:
         super().__init__(name=name or "cat_tensors")
 
         self.cat_dim = cat_dim
-        self.section = section
         self.to_cpu = to_cpu
         self.to_numpy = to_numpy
         self.key_map = {
@@ -37,21 +35,13 @@ class CatTensors(Step):
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def compute(self, tensors: List[ModelOutput]) -> Optional[Dict[str, Any]]:
-        output = []
+    def compute(self, tensors: List[torch.Tensor]) -> Optional[Dict[str, Any]]:
+        output = torch.cat(tensors, dim=self.cat_dim)
 
-        if self.section is not None:
-            for tensor in tensors:
-                output.append(tensor[self.section])
-        else:
-            output = tensors
-
-        if isinstance(output[0], torch.Tensor):
-            output = torch.cat(output, dim=self.cat_dim)
-            if self.to_cpu:
-                output = output.to(torch.device("cpu"))
-            if self.to_numpy:
-                output = output.numpy()
+        if self.to_cpu:
+            output = output.to(torch.device("cpu"))
+        if self.to_numpy:
+            output = output.numpy()
 
         return {"output": output}
 

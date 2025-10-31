@@ -26,11 +26,11 @@ class ModularAutoencoder(BaseModel):
         Args:
             x: Input tensor
         Returns:
-            Model output with 'decoded' and 'latents'
+            Model output with 'recon' and 'latents'
         """
         encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return ModelOutput(decoded=decoded, latents=encoded)
+        recon = self.decoder(encoded)
+        return ModelOutput(recon=recon, latents=encoded)
 
     def for_loss(
         self,
@@ -38,7 +38,7 @@ class ModularAutoencoder(BaseModel):
         target: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """returns reconstructed features and targets for loss computation."""
-        return output["decoded"], target
+        return output["recon"], target
 
 
 class ModularTabularAutoencoder(BaseModel):
@@ -61,22 +61,29 @@ class ModularTabularAutoencoder(BaseModel):
             x_numerical: Tensor of shape [batch_size, n_numerical_features]
             x_categorical: Tensor of shape [batch_size, n_categorical_features]
         Returns:
-            Model output with 'decoded' and 'latents'
+            Model output with 'recon' and 'latents'
         """
         encoded = self.encoder(x_numerical, x_categorical)
-        decoded = self.decoder(encoded)
-        return ModelOutput(decoded=decoded, latents=encoded)
+        recon_numerical, recon_categorical = self.decoder(encoded)
+        return ModelOutput(
+            recon_numerical=recon_numerical,
+            recon_categorical=recon_categorical,
+            latents=encoded,
+        )
 
     def for_loss(
         self,
         output: ModelOutput,
-        numerical_target: torch.Tensor,
-        categorical_target: Sequence[torch.Tensor],
+        target_numerical: torch.Tensor,
+        target_categorical: Sequence[torch.Tensor],
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """returns reconstructed features and targets for loss computation."""
-        recon_numerical, recon_categorical = output["decoded"]
+        recon_numerical, recon_categorical = (
+            output["recon_numerical"],
+            output["recon_categorical"],
+        )
 
-        return recon_numerical, recon_categorical, numerical_target, categorical_target
+        return recon_numerical, recon_categorical, target_numerical, target_categorical
 
 
 @ModelFactory.register()

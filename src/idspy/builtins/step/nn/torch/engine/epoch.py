@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 import torch
 
 from ......core.step.base import Step
-from ......nn.torch.model.base import BaseModel
+from ......nn.torch.model.base import BaseModel, cat_model_outputs
 from ......nn.torch.loss.base import BaseLoss
 from ......nn.torch.engine.epoch import train_epoch, eval_epoch
 from .... import StepFactory
@@ -138,6 +138,11 @@ class ValidateOneEpoch(Step):
             out["losses"] = losses
 
         if self.key_map.get("outputs") is not None:
-            out["outputs"] = model_outputs
+            output_key = self.key_map["outputs"]
+            model_outputs = cat_model_outputs(model_outputs, dim=0)
+            for key in model_outputs.keys():
+                out[f"{output_key}.{key}"] = (
+                    model_outputs[key].to(torch.device("cpu")).detach()
+                )
 
         return out

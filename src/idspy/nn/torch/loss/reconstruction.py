@@ -59,31 +59,6 @@ class CategoricalReconstructionLoss(BaseLoss):
         """
         super().__init__(reduction)
 
-    def _compute_loss_per_feature(
-        self,
-        x: Tensor,
-        targets: Tensor,
-    ) -> Tensor:
-        """Compute loss per categorical feature.
-        Args:
-            x: List of logits tensors, one per categorical feature. Each tensor has shape [batch_size, cardinality]
-            targets: Tensor of shape [batch_size, n_cat_features] with true class indices
-        Returns:
-            Tensor of shape [batch_size, n_cat_features] with per-feature losses
-        """
-
-        losses = []
-        for i, feat_logits in enumerate(x):
-            losses.append(
-                F.cross_entropy(
-                    feat_logits,
-                    targets[:, i].long(),
-                    reduction="none",
-                )
-            )
-
-        return torch.stack(losses, dim=1)
-
     def forward(
         self,
         x: Tensor,
@@ -92,14 +67,28 @@ class CategoricalReconstructionLoss(BaseLoss):
         """Compute categorical reconstruction loss.
 
         Args:
-            x: List of logits tensors, one per categorical feature. Each tensor has shape [batch_size, cardinality]
-            target: Tensor of shape [batch_size, n_cat_features] with true class indices
+            x: Tensor of shape [batch_size, num_categorical, max_cardinality] with logits
+            target: Tensor of shape [batch_size, num_categorical] with true class indices
 
         Returns:
             Loss tensor (scalar or per-sample based on reduction)
         """
-        loss = self._compute_loss_per_feature(x, target)
-        loss = loss.mean(dim=-1)  # Average over features
+        # Reshape x to [batch_size * num_categorical, max_cardinality]
+        batch_size, num_categorical, max_cardinality = x.shape
+        x_reshaped = x.view(-1, max_cardinality)
+
+        # Reshape target to [batch_size * num_categorical]
+        target_reshaped = target.view(-1).long()
+
+        # Compute cross entropy loss
+        loss = F.cross_entropy(x_reshaped, target_reshaped, reduction="none")
+
+        # Reshape back to [batch_size, num_categorical]
+        loss = loss.view(batch_size, num_categorical)
+
+        # Average over features
+        loss = loss.mean(dim=-1)
+
         return self._reduce(loss)
 
 
@@ -147,7 +136,7 @@ class TabularReconstructionLoss(BaseLoss):
     def forward(
         self,
         x_numerical: Tensor,
-        x_categorical: List[Tensor],
+        x_categorical: Tensor,
         target_numerical: Tensor,
         target_categorical: Tensor,
     ) -> Tensor:
@@ -155,9 +144,9 @@ class TabularReconstructionLoss(BaseLoss):
 
         Args:
             x_numerical: Reconstructed numerical features [batch_size, num_numerical]
-            x_categorical: List of logits tensors for each categorical feature
+            x_categorical: Tensor of shape [batch_size, num_categorical, max_cardinality] with logits
             target_numerical: Original numerical features [batch_size, num_numerical]
-            target_categorical: Original categorical features [batch_size, n_cat_features]
+            target_categorical: Original categorical features [batch_size, num_categorical]
 
         Returns:
             Weighted combination of numeric and categorical losses with uncertainty regularization

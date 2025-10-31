@@ -1,40 +1,73 @@
-from typing import Optional, Tuple
+from typing import Tuple, Dict, Sequence
 
 from torch import nn, Tensor
 import torch
+import numpy as np
 
 
 class ModelOutput(dict):
-    """Model output container.
+    """Model output container. Extends dict to enforce Tensor values."""
 
-    Expected to contain at least 'logits' or 'latents' keys and other optional tensors.
-    """
+    def __init__(self, data: Dict[str, Tensor] = None, **kwargs):
+        if data is None:
+            data = kwargs
+        elif kwargs:
+            raise ValueError("Cannot use both 'data' argument and keyword arguments")
 
-    @property
-    def logits(self) -> Tensor:
-        if "logits" not in self:
-            raise KeyError("ModelOutput must contain 'logits'")
-        return self["logits"]
+        for key, value in data.items():
+            if not isinstance(value, Tensor):
+                raise TypeError(
+                    f"ModelOutput value for key '{key}' must be a Tensor, got {type(value)}"
+                )
+        super().__init__(data)
 
-    @property
-    def latents(self) -> Optional[Tensor]:
-        if "latents" not in self:
-            raise KeyError("ModelOutput must contain 'latents'")
-        return self.get("latents")
+    def __setitem__(self, key: str, value: Tensor):
+        if not isinstance(value, Tensor):
+            raise TypeError(
+                f"ModelOutput value for key '{key}' must be a Tensor, got {type(value)}"
+            )
+        super().__setitem__(key, value)
 
     def detach(self) -> "ModelOutput":
         detached = {}
         for k, v in self.items():
-            detached[k] = v.detach() if isinstance(v, Tensor) else v
+            detached[k] = v.detach()
         return ModelOutput(detached)
 
     def to(self, device: torch.device, non_blocking: bool = True) -> "ModelOutput":
         moved = {}
         for k, v in self.items():
-            moved[k] = (
-                v.to(device, non_blocking=non_blocking) if isinstance(v, Tensor) else v
-            )
+            moved[k] = v.to(device, non_blocking=non_blocking)
         return ModelOutput(moved)
+
+    def numpy(self) -> Dict[str, np.ndarray]:
+        numpy_dict = {}
+        for k, v in self.items():
+            numpy_dict[k] = v.cpu().numpy()
+        return numpy_dict
+
+
+def cat_model_outputs(
+    outputs: Sequence[ModelOutput], dim: int = 0
+) -> Dict[str, Tensor]:
+    """Concatenate a sequence of ModelOutput along a specified dimension.
+
+    Args:
+        outputs: Sequence of ModelOutput instances to concatenate.
+        dim: Dimension along which to concatenate.
+
+    Returns:
+        A single ModelOutput with concatenated tensors.
+    """
+    if not outputs:
+        raise ValueError("The outputs sequence is empty.")
+
+    concatenated = {}
+    keys = outputs[0].keys()
+    for key in keys:
+        concatenated[key] = torch.cat([output[key] for output in outputs], dim=dim)
+
+    return ModelOutput(concatenated)
 
 
 class BaseModel(nn.Module):

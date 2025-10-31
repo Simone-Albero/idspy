@@ -96,13 +96,29 @@ class CategoricalDecoder(nn.Module):
             x: Tensor of shape [batch_size, latent_dim]
 
         Returns:
-            List of logits tensors for each categorical feature, each of shape [batch_size, cardinality]
+            Tensor of shape [batch_size, num_categorical, max_cardinality] for reconstructed categorical logits
         """
         # Pass through common trunk
         decoded_features = self.decoder_trunk(x)
 
         # Generate logits for each categorical feature
         cat_logits = [head(decoded_features) for head in self.cat_heads]
+
+        # Pad to max cardinality if needed
+        max_cardinality = max(self.cat_cardinalities)
+        padded_logits = []
+        for logits, cardinality in zip(cat_logits, self.cat_cardinalities):
+            if cardinality < max_cardinality:
+                padding = torch.full(
+                    (logits.size(0), max_cardinality - cardinality),
+                    float("-inf"),
+                    device=logits.device,
+                    dtype=logits.dtype,
+                )
+                logits = torch.cat([logits, padding], dim=1)
+            padded_logits.append(logits)
+
+        cat_logits = torch.stack(padded_logits, dim=1)
 
         return cat_logits
 
@@ -156,16 +172,16 @@ class TabularDecoder(nn.Module):
             ]
         )
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, Sequence[torch.Tensor]]:
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass.
 
         Args:
             x: Tensor of shape [batch_size, latent_dim]
 
         Returns:
-            Dictionary with:
-                - 'numerical': Tensor of shape [batch_size, num_numerical]
-                - 'categorical': List of logits tensors for each categorical feature,each of shape [batch_size, cardinality]
+            Tuple containing:
+                - Tensor of shape [batch_size, num_numerical] for reconstructed numerical features
+                - Tensor of shape [batch_size, num_categorical, max_cardinality] for reconstructed categorical logits
         """
 
         decoded_features = self.decoder_trunk(x)
@@ -175,5 +191,23 @@ class TabularDecoder(nn.Module):
 
         # Generate logits for each categorical feature
         reconstructed_cat_logits = [head(decoded_features) for head in self.cat_heads]
+
+        # Pad to max cardinality if needed
+        max_cardinality = max(self.cat_cardinalities)
+        padded_logits = []
+        for logits, cardinality in zip(
+            reconstructed_cat_logits, self.cat_cardinalities
+        ):
+            if cardinality < max_cardinality:
+                padding = torch.full(
+                    (logits.size(0), max_cardinality - cardinality),
+                    float("-inf"),
+                    device=logits.device,
+                    dtype=logits.dtype,
+                )
+                logits = torch.cat([logits, padding], dim=1)
+            padded_logits.append(logits)
+
+        reconstructed_cat_logits = torch.stack(padded_logits, dim=1)
 
         return reconstructed_numerical, reconstructed_cat_logits
