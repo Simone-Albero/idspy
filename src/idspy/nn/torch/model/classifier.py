@@ -51,7 +51,7 @@ class ModularTabularClassifier(BaseModel):
         classifier_head: nn.Module,
     ) -> None:
         super().__init__()
-        self.embedding_module = embedding_module
+        self.embedding = embedding_module
         self.feature_extractor = feature_extractor
         self.classifier_head = classifier_head
 
@@ -141,10 +141,10 @@ class TabularClassifier(ModularTabularClassifier):
     ) -> None:
         hidden_dims = list(hidden_dims)
 
-        self.embedding = EmbeddingBlock(
+        embedding = EmbeddingBlock(
             num_categorical, cat_cardinalities, max_emb_dim=max_emb_dim
         )
-        emb_dim_total = sum(self.embedding.embedding_dims)
+        emb_dim_total = sum(embedding.embedding_dims)
 
         in_features = num_numerical + emb_dim_total
 
@@ -166,7 +166,7 @@ class TabularClassifier(ModularTabularClassifier):
         classifier_head = nn.Linear(feat_dim, out_features, bias=bias)
 
         super().__init__(
-            embedding_module=self.embedding,
+            embedding_module=embedding,
             feature_extractor=feature_extractor,
             classifier_head=classifier_head,
         )
