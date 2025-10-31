@@ -8,16 +8,10 @@ from ....core.step.base import Step
 from .. import StepFactory
 
 
-def _auto_detect_prefix(metrics_key: str) -> str:
-    """Auto-detect prefix from metrics_key."""
-    if "train" in metrics_key.lower():
-        return "train"
-    elif "val" in metrics_key.lower() or "validation" in metrics_key.lower():
-        return "val"
-    elif "test" in metrics_key.lower():
-        return "test"
-    else:
-        return ""
+def _auto_detect_prefix(key: str, separator: str = ".") -> str:
+    """Auto-detect prefix from key by taking the first part before the separator."""
+    parts = key.split(separator)
+    return parts[0] if parts else ""
 
 
 def _make_tag(separator: str = "/", *args: str) -> str:
@@ -32,7 +26,7 @@ def _to_cpu_flat(x: torch.Tensor) -> torch.Tensor:
 
 @StepFactory.register()
 @Step.needs("metrics")
-class MetricsLogger(Step):
+class Logger(Step):
     """Log metrics to TensorBoard."""
 
     SEPARATOR = "/"
