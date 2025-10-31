@@ -9,6 +9,7 @@ from pandas.api.types import CategoricalDtype
 from ....core.step.base import Step
 from ....core.step.fittable import FittableStep
 from .. import StepFactory
+from ....plot.dict import dict_to_table
 
 
 logger = logging.getLogger(__name__)
@@ -160,7 +161,10 @@ class LabelMap(FittableStep):
         df[self.target_col] = labels
         df.tab.update_role(cols=self.target_col, role="label")
 
-        return {"df": df, "labels_mapping": self.labels_mapping}
+        return {
+            "df": df,
+            "labels_mapping": dict_to_table(self.labels_mapping, title="Label Mapping"),
+        }
 
     def __del__(self):
         logger.info(f"LabelMap mapping:\n{self.labels_mapping}")
@@ -234,7 +238,12 @@ class ColumnMap(FittableStep):
         }
         self.col_mapping["__unseen__"] = self.default
 
-        return {"df": df, "col_mapping": self.col_mapping}
+        return {
+            "df": df,
+            "col_mapping": dict_to_table(
+                self.col_mapping, title=f"{self.source_col} Mapping"
+            ),
+        }
 
     def __del__(self):
         logger.info(f"ColumnMap mapping for '{self.source_col}':\n{self.col_mapping}")
