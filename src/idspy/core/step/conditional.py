@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from .base import Step
 
@@ -7,9 +7,15 @@ from .base import Step
 class ConditionalStep(Step, ABC):
     """A Step that can be conditionally executed."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._should_run = True
+    def __init__(
+        self, *args, step: Optional[Step] = None, name: Optional[str] = None, **kwargs
+    ):
+        if step is not None:
+            self._controlled_step = step
+            super().__init__(name=name or f"conditional_{step.name}", **kwargs)
+        else:
+            self._controlled_step = None
+            super().__init__(*args, **kwargs)
 
     @abstractmethod
     def should_run(self, **kwargs) -> bool:
@@ -30,8 +36,12 @@ class ConditionalStep(Step, ABC):
         if not self.should_run(**kwargs):
             self.on_skip(**kwargs)
             return {}
+
+        if self._controlled_step is not None:
+            return self._controlled_step.compute(**kwargs)
+
         return self.compute(**kwargs)
 
     def __repr__(self) -> str:
         base = super().__repr__().rstrip(")")
-        return f"{base}, should_run={self._should_run})"
+        return f"{base}, conditional=True)"

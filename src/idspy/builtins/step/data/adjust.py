@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from ....core.step.base import Step
+from ....core.step.conditional import ConditionalStep
 from ....data.tab_accessor import reattach_meta
 from .. import StepFactory
 
@@ -34,13 +35,13 @@ class DropNulls(Step):
 
 @StepFactory.register()
 @Step.needs("df")
-class Filter(Step):
+class Filter(ConditionalStep):
     """Filter rows using a pandas query string."""
 
     def __init__(
         self,
-        query: str,
         df_key: str = "data.base_df",
+        query: Optional[str] = None,
         name: Optional[str] = None,
     ) -> None:
         self.query = query
@@ -50,6 +51,12 @@ class Filter(Step):
         self.key_map = {
             "df": df_key,
         }
+
+    def should_run(self, **kwargs):
+        return self.query is not None
+
+    def on_skip(self, **kwargs):
+        return
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
