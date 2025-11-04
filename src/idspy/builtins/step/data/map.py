@@ -103,7 +103,7 @@ class LabelMap(FittableStep):
         default: int = -1,
         df_key: str = "data.base_df",
         target_col: str = "label_encoded",
-        labels_mapping_key: str = "data.label_mapping",
+        labels_mapping_key: str = "data.labels_mapping",
         name: Optional[str] = None,
     ) -> None:
         self.benign_tag = benign_tag
@@ -141,8 +141,7 @@ class LabelMap(FittableStep):
         labels = df[label_col].copy()
 
         if self.benign_tag is not None:
-            labels = (labels == self.benign_tag).astype("int32")
-            labels = labels.where(labels == 0, 1)
+            labels = (labels != self.benign_tag).astype("int32")
 
             self.labels_mapping = {self.benign_tag: 0, "others": 1}
         else:
@@ -163,7 +162,11 @@ class LabelMap(FittableStep):
 
         return {
             "df": df,
-            "labels_mapping": dict_to_table(self.labels_mapping, title="Label Mapping"),
+            "labels_mapping": {
+                "labels_mapping": dict_to_table(
+                    self.labels_mapping, title="Label Mapping"
+                )
+            },
         }
 
     def __del__(self):
@@ -240,9 +243,11 @@ class ColumnMap(FittableStep):
 
         return {
             "df": df,
-            "col_mapping": dict_to_table(
-                self.col_mapping, title=f"{self.source_col} Mapping"
-            ),
+            "col_mapping": {
+                "col_mapping": dict_to_table(
+                    self.col_mapping, title=f"{self.source_col} Mapping"
+                )
+            },
         }
 
     def __del__(self):

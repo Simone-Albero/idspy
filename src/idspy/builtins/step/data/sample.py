@@ -5,7 +5,7 @@ import numpy as np
 
 from ....core.step.base import Step
 from ....data.tab_accessor import reattach_meta
-from ..helpers import sample_vectors_and_labels
+from ..helpers import sample_vectors_and_labels, sample_labels
 from .. import StepFactory
 
 
@@ -97,41 +97,62 @@ class Downsample(Step):
 
 
 @StepFactory.register()
-@Step.needs("vectors", "labels")
-class SampleVectorsAndLabels(Step):
+@Step.needs("labels")
+class ComputeIndicesByLabel(Step):
+    """Select sample indices from labels with optional stratification."""
 
     def __init__(
         self,
         sample_size: int,
         stratify: bool = True,
         random_state: Optional[int] = None,
-        vectors_key: str = "data.base_df",
-        labels_key: Optional[str] = None,
+        labels_key: str = "data.labels",
+        indices_key: str = "data.selected_indices",
         name: Optional[str] = None,
     ) -> None:
+        super().__init__(name=name or "compute_indices_by_label")
         self.sample_size = sample_size
         self.stratify = stratify
         self.random_state = random_state
-
-        super().__init__(name=name or "sample_vectors_and_labels")
         self.key_map = {
-            "vectors": vectors_key,
+            "labels": labels_key,
+            "selected_indices": indices_key,
         }
-        if labels_key is not None:
-            self.key_map["labels"] = labels_key
+
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def compute(self, labels: np.ndarray) -> Optional[Dict[str, Any]]:
+        samples = sample_labels(
+            labels, self.sample_size, self.stratify, self.random_state
+        )
+        return {"selected_indices": samples}
+
+
+@StepFactory.register()
+@Step.needs("data", "selected_indices")
+class SelectSamplesByIndices(Step):
+    """Select samples from data based on provided indices."""
+
+    def __init__(
+        self,
+        indices_key: str = "data.selected_indices",
+        data_key: str = "data.base_df",
+        output_key: str = "data.sampled_df",
+        name: Optional[str] = None,
+    ) -> None:
+        super().__init__(name=name or "select_samples_by_indices")
+        self.key_map = {
+            "selected_indices": indices_key,
+            "data": data_key,
+            "sampled_data": output_key,
+        }
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
     def compute(
-        self, vectors: np.ndarray, labels: Optional[np.ndarray] = None
+        self, data: pd.DataFrame, selected_indices: np.ndarray
     ) -> Optional[Dict[str, Any]]:
-
-        vectors, labels = sample_vectors_and_labels(
-            vectors, labels, self.sample_size, self.stratify, self.random_state
-        )
-
-        return {
-            "vectors": vectors,
-            "labels": labels,
-        }
+        sampled_data = data[selected_indices]
+        return {"sampled_data": sampled_data}

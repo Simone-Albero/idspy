@@ -182,6 +182,7 @@ def distribution_plot(
     x_label: str = "Value",
     y_label: str = "Frequency",
     x_range: tuple[float, float] | None = None,
+    log_scale: bool = False,
 ) -> plt.Figure:
     """Plot distribution of values with optional statistics.
 
@@ -255,6 +256,10 @@ def distribution_plot(
         ax.set_xlim(x_range)
 
     ax.grid(True, alpha=0.3, axis="y")
+
+    if log_scale:
+        ax.set_yscale("log")
+        ax.set_ylabel(f"{y_label} (log scale)", fontsize=12)
 
     fig.tight_layout()
     return fig

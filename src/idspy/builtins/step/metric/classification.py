@@ -86,8 +86,10 @@ class SupervisedClassificationMetrics(Step):
         metrics = self._compute_metrics(predictions, labels)
         metrics["confidence_distribution"] = distribution_plot(
             confidences,
+            bins=10,
             title="Confidence Scores Distribution",
             x_range=(0, 1),
+            log_scale=True,
         )
         return {"metrics": metrics}
 
@@ -147,7 +149,6 @@ class UnsupervisedClassificationMetrics(Step):
         self, predictions: np.ndarray, labels: np.ndarray
     ) -> Optional[Dict[str, Any]]:
         """Compute ROC AUC for unsupervised classification."""
-        labels = 1 - labels  # invert labels for anomaly detection
         fpr, tpr, thresholds = roc_curve(labels, predictions)
         roc_auc = auc(fpr, tpr)
         optimal_threshold = self._find_optimal_threshold(fpr, tpr, thresholds)
@@ -158,26 +159,22 @@ class UnsupervisedClassificationMetrics(Step):
         # Compute binary classification metrics
         binary_metrics = self._compute_binary_metrics(labels, predictions_binary)
 
-        # Compute confidence as normalized distance from optimal threshold
-        # Use actual min/max of predictions for normalization
         distance_from_threshold = np.abs(predictions - optimal_threshold)
-        max_distance = max(
-            optimal_threshold - predictions.min(),  # max distance below threshold
-            predictions.max() - optimal_threshold,  # max distance above threshold
-        )
-        confidences = (
-            distance_from_threshold / max_distance
-            if max_distance > 0
-            else np.zeros_like(distance_from_threshold)
-        )
+
+        # Compute confidence using sigmoid-based transformation for smoother confidence
+        # This gives confidence=0.5 at threshold, approaching 1 for far samples
+        scale_factor = np.std(predictions) if np.std(predictions) > 0 else 1.0
+        confidences = 1 / (1 + np.exp(-distance_from_threshold / scale_factor))
 
         metrics = {
             "roc_auc": roc_auc_plot(fpr, tpr, roc_auc),
             "binary_metrics": dict_to_bar_plot(binary_metrics),
             "confidence_distribution": distribution_plot(
                 confidences,
+                bins=10,
                 title="Confidence Scores Distribution",
                 x_range=(0, 1),
+                log_scale=True,
             ),
         }
 

@@ -26,7 +26,7 @@ def _to_cpu_flat(x: torch.Tensor) -> torch.Tensor:
 
 @StepFactory.register()
 @Step.needs("subject")
-class Logger(Step):
+class TBLogger(Step):
     """Log metrics to TensorBoard."""
 
     SEPARATOR = "/"
@@ -104,7 +104,7 @@ class Logger(Step):
 
 @StepFactory.register()
 @Step.needs("model")
-class WeightsLogger(Step):
+class TBWeightsLogger(Step):
     """Log model weights/gradients to TensorBoard."""
 
     SEPARATOR = "/"

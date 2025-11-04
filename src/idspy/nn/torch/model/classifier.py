@@ -38,7 +38,7 @@ class ModularClassifier(BaseModel):
         target: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Returns logits and target for loss computation."""
-        return output.logits, target
+        return output["logits"], target
 
 
 class ModularTabularClassifier(BaseModel):
@@ -81,7 +81,7 @@ class ModularTabularClassifier(BaseModel):
         target: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Returns logits and target for loss computation."""
-        return output.logits, target
+        return output["logits"], target
 
 
 @ModelFactory.register()
