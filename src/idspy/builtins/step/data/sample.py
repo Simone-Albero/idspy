@@ -62,6 +62,7 @@ class Downsample(Step):
         frac: float,
         class_col: Optional[str] = None,
         df_key: str = "data.base_df",
+        random_state: Optional[int] = None,
         name: Optional[str] = None,
     ) -> None:
         if not (0.0 < frac <= 1.0):
@@ -69,6 +70,7 @@ class Downsample(Step):
 
         self.frac = frac
         self.class_col = class_col
+        self.random_state = random_state
 
         super().__init__(name=name or "downsample")
         self.key_map = {
