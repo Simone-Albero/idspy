@@ -12,6 +12,7 @@ from torch.profiler import (
 from ....core.step.base import Step
 from ....core.step.contextual import ContextualStep
 from .. import StepFactory
+from ....plot.dict import dict_to_table
 
 
 @StepFactory.register()
@@ -103,4 +104,4 @@ class DataFrameProfiler(Step):
 
         labels_count = df.tab.label.value_counts().to_dict()
         report.update({f"label_count_{k}": v for k, v in labels_count.items()})
-        return {"output": report}
+        return {"output": {"report": dict_to_table(report, title="Dataset Statistics")}}
