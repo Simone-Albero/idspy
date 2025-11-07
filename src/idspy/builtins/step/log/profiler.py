@@ -1,5 +1,6 @@
-from typing import Optional
+from typing import Dict, Optional
 
+import pandas as pd
 import torch
 from torch.profiler import (
     profile,
@@ -70,3 +71,36 @@ class TorchProfiler(ContextualStep):
         )
 
         return profiler
+
+
+@StepFactory.register()
+@Step.needs("df")
+class DataFrameProfiler(Step):
+    """Compute simple ml driven statistics from a DataFrame."""
+
+    def __init__(
+        self,
+        df_key: str = "data.base_df",
+        output_key: str = "data.profile_report",
+        name: Optional[str] = None,
+    ) -> None:
+        super().__init__(name=name or "data_frame_profiler")
+        self.key_map = {
+            "df": df_key,
+            "output": output_key,
+        }
+
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, any]]:
+        n_rows, _ = df.shape
+        report = {
+            "num_rows": n_rows,
+            "num_numerical_columns": df.tab.numerical.shape[1],
+            "num_categorical_columns": df.tab.categorical.shape[1],
+        }
+
+        labels_count = df.tab.label.value_counts().to_dict()
+        report.update({f"label_count_{k}": v for k, v in labels_count.items()})
+        return {"output": report}
