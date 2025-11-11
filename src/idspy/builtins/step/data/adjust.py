@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from ....core.step.base import Step
+from ....core.step.fittable import FittableStep
 from ....core.step.conditional import ConditionalStep
 from ....data.tab_accessor import reattach_meta
 from .. import StepFactory
@@ -151,3 +152,61 @@ class DFToNumpy(Step):
             return {"output": df[self.cols].values}
 
         return {"output": df.values}
+
+
+@StepFactory.register()
+@Step.needs("df")
+class Clip(FittableStep):
+    """Clip extreme values based on percentiles or absolute thresholds."""
+
+    def __init__(
+        self,
+        df_key: str = "data.base_df",
+        method: str = "percentile",  # "percentile" or "absolute"
+        lower: float = 1.0,  # 1st percentile or absolute value
+        upper: float = 99.0,  # 99th percentile or absolute value
+        name: Optional[str] = None,
+    ) -> None:
+        self._lower_bounds: Optional[pd.Series] = None
+        self._upper_bounds: Optional[pd.Series] = None
+        self.method = method
+        self.lower = lower
+        self.upper = upper
+
+        super().__init__(name=name or "clip_outliers")
+        self.key_map = {"df": df_key}
+
+    def bindings(self) -> Dict[str, str]:
+        return self.key_map
+
+    def fit_impl(self, df: pd.DataFrame) -> None:
+        """Fit clipping bounds on train split."""
+        numerical_data = df.tab.train.tab.numerical
+        if numerical_data.shape[1] == 0:
+            self._lower_bounds = pd.Series(dtype="float64")
+            self._upper_bounds = pd.Series(dtype="float64")
+            return
+
+        numerical_data = numerical_data.replace([np.inf, -np.inf], np.nan)
+
+        if self.method == "percentile":
+            self._lower_bounds = numerical_data.quantile(self.lower / 100)
+            self._upper_bounds = numerical_data.quantile(self.upper / 100)
+        else:  # absolute
+            self._lower_bounds = pd.Series(self.lower, index=numerical_data.columns)
+            self._upper_bounds = pd.Series(self.upper, index=numerical_data.columns)
+
+    def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """Apply clipping to numerical columns."""
+        numerical_data = df.tab.numerical
+        if numerical_data.shape[1] == 0:
+            return {"df": df}
+
+        numerical_data = numerical_data.replace([np.inf, -np.inf], np.nan)
+
+        cols = numerical_data.columns
+        lower = self._lower_bounds.reindex(cols, fill_value=-np.inf)
+        upper = self._upper_bounds.reindex(cols, fill_value=np.inf)
+
+        df.tab.numerical = numerical_data.clip(lower=lower, upper=upper, axis=1)
+        return {"df": df}
