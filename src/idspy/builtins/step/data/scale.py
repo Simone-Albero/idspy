@@ -51,7 +51,7 @@ class StandardScale(FittableStep):
 
         num_scaled = numerical_data / self._scale
         self._means_s = num_scaled.mean()
-        self._stds_s = num_scaled.std(ddof=0).clip(lower=1e-10, upper=None)
+        self._stds_s = num_scaled.std(ddof=0).clip(lower=1e-6, upper=None)
 
     def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """Apply standardization to numerical columns."""
@@ -69,7 +69,11 @@ class StandardScale(FittableStep):
         means_s = self._means_s.reindex(cols, fill_value=0.0)
         stds_s = self._stds_s.reindex(cols, fill_value=1.0)
 
-        df.tab.numerical = (numerical_data / scale - means_s) / stds_s
+        scaled_data = (numerical_data / scale - means_s) / stds_s
+        scaled_data = scaled_data.clip(lower=-1e10, upper=1e10)
+        scaled_data = scaled_data.replace([np.inf, -np.inf], 0.0).fillna(0.0)
+
+        df.tab.numerical = scaled_data
         return {"df": df}
 
 
