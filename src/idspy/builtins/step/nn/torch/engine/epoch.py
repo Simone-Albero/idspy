@@ -54,7 +54,7 @@ class TrainOneEpoch(Step):
         context: Optional[any] = None,
     ) -> Optional[Dict[str, Any]]:
 
-        start_time = time.time()
+        start_time = time()
         average_loss, grad_norm, lr = train_epoch(
             dataloader=dataloader,
             model=model,
@@ -65,7 +65,7 @@ class TrainOneEpoch(Step):
             clip_grad_max_norm=self.clip_grad_max_norm,
             profiler=context,
         )
-        elapsed_time = time.time() - start_time
+        elapsed_time = time() - start_time
 
         return {
             "model": model,
@@ -124,7 +124,7 @@ class ValidateOneEpoch(Step):
         loss_fn: Optional[BaseLoss] = None,
         context: Optional[any] = None,
     ) -> Optional[Dict[str, Any]]:
-        start_time = time.time()
+        start_time = time()
         average_loss, losses, model_outputs = eval_epoch(
             dataloader=dataloader,
             model=model,
@@ -133,7 +133,7 @@ class ValidateOneEpoch(Step):
             save_outputs=self.save_outputs,
             profiler=context,
         )
-        elapsed_time = time.time() - start_time
+        elapsed_time = time() - start_time
 
         out = {
             "model": model,
