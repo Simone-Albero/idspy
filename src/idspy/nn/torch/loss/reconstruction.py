@@ -1,5 +1,6 @@
 import logging
-from typing import List
+from pathlib import Path
+from typing import Optional
 
 from torch import Tensor
 import torch
@@ -104,6 +105,7 @@ class TabularReconstructionLoss(BaseLoss):
         categorical_sigma: float = 1.0,
         min_sigma: float = 0.1,
         max_sigma: float = 10.0,
+        save_path: Optional[str] = None,
     ) -> None:
         """Initialize tabular reconstruction loss.
 
@@ -114,6 +116,7 @@ class TabularReconstructionLoss(BaseLoss):
             categorical_sigma: Initial/fixed sigma (std) for categorical loss weighting
             min_sigma: Minimum allowed sigma value (prevents collapse to zero)
             max_sigma: Maximum allowed sigma value (prevents explosion)
+            save_path: Path where to save/load learnable parameters (if learnable_weight=True)
         """
         super().__init__(reduction)
 
@@ -132,6 +135,16 @@ class TabularReconstructionLoss(BaseLoss):
         self.learnable_weight = learnable_weight
         self.min_sigma = min_sigma
         self.max_sigma = max_sigma
+        self.save_path = Path(save_path) if save_path else None
+
+        if self.save_path and self.learnable_weight:
+            try:
+                self.load_parameters()
+            except Exception as e:
+                logger.warning(
+                    f"Could not load parameters from {self.save_path}, "
+                    f"using standard initialization. Error: {e}"
+                )
 
     def forward(
         self,
@@ -203,6 +216,69 @@ class TabularReconstructionLoss(BaseLoss):
             "categorical_precision": torch.exp(-log_var_categorical).item(),
         }
 
+    def save_parameters(self, path: Optional[str] = None) -> None:
+        """Save learnable parameters to disk.
+
+        Args:
+            path: Path where to save parameters. If None, uses self.save_path
+        """
+        if not self.learnable_weight:
+            logger.warning("No learnable parameters to save")
+            return
+
+        save_path = Path(path) if path else self.save_path
+
+        if save_path is None:
+            logger.warning("No save path provided, skipping parameter save")
+            return
+
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        weights = self.get_weights()
+        torch.save(
+            {
+                "numerical_sigma": self.numerical_sigma.data,
+                "categorical_sigma": self.categorical_sigma.data,
+                "weights_info": weights,
+            },
+            save_path,
+        )
+
+        logger.info(f"Saved learnable parameters to {save_path}")
+
+    def load_parameters(self, path: Optional[str] = None) -> None:
+        """Load learnable parameters from disk.
+
+        Args:
+            path: Path from where to load parameters. If None, uses self.save_path
+        """
+        if not self.learnable_weight:
+            logger.warning(
+                "Cannot load parameters: loss is not using learnable weights"
+            )
+            return
+
+        load_path = Path(path) if path else self.save_path
+
+        if load_path is None:
+            logger.warning("No load path provided, skipping parameter load")
+            return
+
+        if not load_path.exists():
+            logger.error(f"Parameter file not found at {load_path}")
+            return
+
+        try:
+            checkpoint = torch.load(load_path, map_location="cpu")
+
+            # Load the sigma parameters
+            self.numerical_sigma.data = checkpoint["numerical_sigma"]
+            self.categorical_sigma.data = checkpoint["categorical_sigma"]
+
+        except Exception as e:
+            logger.error(f"Failed to load parameters from {load_path}: {e}")
+            raise
+
     def __del__(self):
         if self.learnable_weight:
             weights = self.get_weights()
@@ -213,3 +289,9 @@ class TabularReconstructionLoss(BaseLoss):
                 f"\n  - Numerical precision: {weights['numerical_precision']:.4f}"
                 f"\n  - Categorical precision: {weights['categorical_precision']:.4f}"
             )
+
+            if self.save_path:
+                try:
+                    self.save_parameters()
+                except Exception as e:
+                    logger.error(f"Failed to auto-save parameters: {e}")
