@@ -170,7 +170,6 @@ class CategoricalAutoencoder(ModularAutoencoder):
         activation: Callable[[], nn.Module] = nn.ReLU,
         norm_layer: Optional[Callable[[int], nn.Module]] = None,
         bias: bool = True,
-        noise_factor: float = 0.0,
     ) -> None:
         hidden_dims = list(hidden_dims)
 
@@ -199,7 +198,7 @@ class CategoricalAutoencoder(ModularAutoencoder):
             bias=bias,
         )
 
-        super().__init__(encoder=encoder, decoder=decoder, noise_factor=noise_factor)
+        super().__init__(encoder=encoder, decoder=decoder)
 
 
 @ModelFactory.register()
@@ -217,6 +216,7 @@ class TabularAutoencoder(ModularTabularAutoencoder):
         activation: Callable[[], nn.Module] = nn.ReLU,
         norm_layer: Optional[Callable[[int], nn.Module]] = None,
         bias: bool = True,
+        noise_factor: float = 0.0,
     ) -> None:
         hidden_dims = list(hidden_dims)
 
@@ -246,7 +246,7 @@ class TabularAutoencoder(ModularTabularAutoencoder):
             bias=bias,
         )
 
-        super().__init__(encoder=encoder, decoder=decoder)
+        super().__init__(encoder=encoder, decoder=decoder, noise_factor=noise_factor)
 
 
 @ModelFactory.register()
