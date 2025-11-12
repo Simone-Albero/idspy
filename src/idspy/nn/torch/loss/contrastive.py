@@ -42,15 +42,16 @@ class SupervisedContrastiveLoss(BaseLoss):
         Returns:
             Loss tensor (scalar or per-sample based on reduction)
         """
-        z = F.normalize(z, dim=1)
+        # Normalize embeddings (with epsilon to avoid division by zero)
+        z = F.normalize(z, dim=1, eps=1e-8)
         batch_size = z.shape[0]
 
         # Compute similarity matrix
         similarity = (z @ z.T) / self.temperature
 
-        # Mask self-similarities to -inf
+        # Mask self-similarities to large negative value (not -inf to avoid log issues)
         self_mask = torch.eye(batch_size, dtype=torch.bool, device=z.device)
-        similarity = similarity.masked_fill(self_mask, float("-inf"))
+        similarity = similarity.masked_fill(self_mask, -1e9)
 
         # Create positive mask based on target labels
         positive_mask = target.unsqueeze(0) == target.unsqueeze(1)
@@ -70,12 +71,16 @@ class SupervisedContrastiveLoss(BaseLoss):
         if not valid_samples.any():
             return torch.tensor(0.0, device=z.device, requires_grad=True)
 
-        # Compute log probabilities and sum over positives
+        # Compute log probabilities
         log_probs = F.log_softmax(similarity, dim=1)
+
+        # Sum log probabilities over positive pairs
         log_probs_positive = (log_probs * positive_mask).sum(dim=1)
 
-        # Average over positive pairs
-        loss = -log_probs_positive[valid_samples] / num_positives[valid_samples]
+        # Average over positive pairs (add epsilon to avoid division by zero)
+        loss = -log_probs_positive[valid_samples] / (
+            num_positives[valid_samples] + 1e-8
+        )
 
         return self._reduce(loss)
 
@@ -114,8 +119,9 @@ class NtXentLoss(BaseLoss):
         Returns:
             Loss tensor (scalar or per-sample based on reduction)
         """
-        z1 = F.normalize(z1, dim=1)
-        z2 = F.normalize(z2, dim=1)
+        # Normalize embeddings (with epsilon to avoid division by zero)
+        z1 = F.normalize(z1, dim=1, eps=1e-8)
+        z2 = F.normalize(z2, dim=1, eps=1e-8)
 
         batch_size = z1.shape[0]
 
@@ -125,9 +131,9 @@ class NtXentLoss(BaseLoss):
         # Compute similarity matrix
         similarity = (z @ z.T) / self.temperature
 
-        # Mask self-similarities to -inf
+        # Mask self-similarities to large negative value (not -inf to avoid log issues)
         self_mask = torch.eye(2 * batch_size, dtype=torch.bool, device=z.device)
-        similarity = similarity.masked_fill(self_mask, float("-inf"))
+        similarity = similarity.masked_fill(self_mask, -1e9)
 
         # Create positive mask for augmented pairs
         positive_mask = torch.zeros_like(similarity, dtype=torch.bool)
