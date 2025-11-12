@@ -73,7 +73,7 @@ class SupConLoss(BaseLoss):
 
 
 @LossFactory.register()
-class NTXentLoss(BaseLoss):
+class NtXentLoss(BaseLoss):
 
     def __init__(
         self,
