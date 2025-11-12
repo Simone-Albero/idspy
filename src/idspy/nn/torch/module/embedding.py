@@ -4,7 +4,7 @@ import torch
 from torch import nn, Tensor
 
 
-class EmbeddingBlock(nn.Module):
+class EmbeddingModule(nn.Module):
     """Feature embedding for categorical variables with padding/unknown support."""
 
     def __init__(
@@ -19,7 +19,7 @@ class EmbeddingBlock(nn.Module):
             Index 0 is reserved for padding/unknown values and initialized to zeros.
         """
         super().__init__()
-        self.embeddings = nn.ModuleList()
+        self.embedding_layers = nn.ModuleList()
         self.embedding_dims = []
         if num_features is None and cardinalities is None:
             raise ValueError("Either num_features or cardinalities must be provided.")
@@ -29,8 +29,8 @@ class EmbeddingBlock(nn.Module):
 
         for card in cardinalities:
             dim = min(max_emb_dim, int(card**0.5))
-            emb = nn.Embedding(card + 1, dim, padding_idx=0)
-            self.embeddings.append(emb)
+            embedding_layer = nn.Embedding(card + 1, dim, padding_idx=0)
+            self.embedding_layers.append(embedding_layer)
             self.embedding_dims.append(dim)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -43,11 +43,7 @@ class EmbeddingBlock(nn.Module):
         Returns:
             Embedded features [batch_size, sum(embedding_dims)]
         """
-        embs = []
-        for i, emb in enumerate(self.embeddings):
-            embs.append(emb(x[:, i]))
-        return torch.cat(embs, dim=1)
-
-    def get_embedding_dims(self) -> Sequence[int]:
-        """Get the list of embedding dimensions for each categorical feature."""
-        return self.embedding_dims
+        embedded_features = []
+        for i, embedding_layer in enumerate(self.embedding_layers):
+            embedded_features.append(embedding_layer(x[:, i]))
+        return torch.cat(embedded_features, dim=1)

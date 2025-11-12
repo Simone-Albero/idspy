@@ -4,8 +4,8 @@ import torch
 from torch import nn
 
 
-class MLPBlock(nn.Module):
-    """Reusable MLP block (feedforward network)."""
+class MLPModule(nn.Module):
+    """Reusable MLP module (feedforward network)."""
 
     def __init__(
         self,
@@ -17,7 +17,7 @@ class MLPBlock(nn.Module):
         dropout: float = 0.0,
         bias: bool = True,
     ) -> None:
-        """Initialize an MLP block.
+        """Initialize an MLP module.
 
         Args:
             in_features: Number of input features.

@@ -1,13 +1,13 @@
-from typing import Sequence, Optional, Callable, Union, Tuple
+from typing import Sequence, Optional, Callable
 
 import torch
 from torch import nn
 
-from ..module.mlp import MLPBlock
-from ..module.embedding import EmbeddingBlock
+from ..module.mlp import MLPModule
+from ..module.embedding import EmbeddingModule
 
 
-class NumericalEncoder(nn.Module):
+class NumericalEncoderModule(nn.Module):
     """Encoder for numerical features using MLP."""
 
     def __init__(
@@ -23,7 +23,7 @@ class NumericalEncoder(nn.Module):
         super().__init__()
         hidden_dims = list(hidden_dims)
 
-        self.encoder = MLPBlock(
+        self.mlp = MLPModule(
             in_features=in_features,
             out_features=out_features,
             hidden_dims=hidden_dims,
@@ -37,22 +37,21 @@ class NumericalEncoder(nn.Module):
         """Forward pass.
 
         Args:
-            x: Tensor of shape [batch_size, n_numerical_features]
+            x: Tensor of shape [batch_size, num_numerical_features]
         Returns:
             Tensor of shape [batch_size, out_features]
         """
-        encoded = self.encoder(x)
-        return encoded
+        return self.mlp(x)
 
 
-class CategoricalEncoder(nn.Module):
+class CategoricalEncoderModule(nn.Module):
     """Encoder for categorical features using Embedding and MLP."""
 
     def __init__(
         self,
         out_features: int,
-        num_categorical: Optional[int] = None,
-        cat_cardinalities: Optional[Sequence[int]] = None,
+        num_features: Optional[int] = None,
+        cardinalities: Optional[Sequence[int]] = None,
         max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
@@ -63,14 +62,14 @@ class CategoricalEncoder(nn.Module):
         super().__init__()
         hidden_dims = list(hidden_dims)
 
-        self.embedding = EmbeddingBlock(
-            num_categorical, cat_cardinalities, max_emb_dim=max_emb_dim
+        self.embedding = EmbeddingModule(
+            num_features, cardinalities, max_emb_dim=max_emb_dim
         )
 
-        embed_features = sum(self.embedding.get_embedding_dims())
+        embedding_features = sum(self.embedding.embedding_dims)
 
-        self.encoder = MLPBlock(
-            in_features=embed_features,
+        self.mlp = MLPModule(
+            in_features=embedding_features,
             out_features=out_features,
             hidden_dims=hidden_dims,
             activation=activation,
@@ -83,25 +82,24 @@ class CategoricalEncoder(nn.Module):
         """Forward pass.
 
         Args:
-            x: Tensor of shape [batch_size, n_cat_features]
+            x: Tensor of shape [batch_size, num_categorical_features]
 
         Returns:
             Tensor of shape [batch_size, out_features]
         """
         embedded = self.embedding(x)
-        encoded = self.encoder(embedded)
-        return encoded
+        return self.mlp(embedded)
 
 
-class TabularEncoder(nn.Module):
+class TabularEncoderModule(nn.Module):
     """Unified encoder for numerical and categorical features."""
 
     def __init__(
         self,
-        num_numerical: int,
+        num_numerical_features: int,
         out_features: int,
-        num_categorical: Optional[int] = None,
-        cat_cardinalities: Optional[Sequence[int]] = None,
+        num_categorical_features: Optional[int] = None,
+        cardinalities: Optional[Sequence[int]] = None,
         max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
@@ -111,17 +109,16 @@ class TabularEncoder(nn.Module):
     ) -> None:
         super().__init__()
 
-        self.num_numerical = num_numerical
-        self.cat_cardinalities = cat_cardinalities
+        self.num_numerical_features = num_numerical_features
 
-        self.embedding = EmbeddingBlock(
-            num_categorical, cat_cardinalities, max_emb_dim=max_emb_dim
+        self.embedding = EmbeddingModule(
+            num_categorical_features, cardinalities, max_emb_dim=max_emb_dim
         )
 
-        embed_features = sum(self.embedding.get_embedding_dims())
-        total_features = num_numerical + embed_features
+        embedding_features = sum(self.embedding.embedding_dims)
+        total_features = num_numerical_features + embedding_features
 
-        self.encoder = MLPBlock(
+        self.mlp = MLPModule(
             in_features=total_features,
             out_features=out_features,
             hidden_dims=hidden_dims,
@@ -137,15 +134,12 @@ class TabularEncoder(nn.Module):
         """Forward pass.
 
         Args:
-            x_numerical: Tensor of shape [batch_size, num_numerical]
-            x_categorical: Tensor of shape [batch_size, n_cat_features]
+            x_numerical: Tensor of shape [batch_size, num_numerical_features]
+            x_categorical: Tensor of shape [batch_size, num_categorical_features]
 
         Returns:
             Tensor of shape [batch_size, out_features]
         """
-        embedded_cat = self.embedding(x_categorical)
-
-        combined = torch.cat([x_numerical, embedded_cat], dim=1)
-        encoded = self.encoder(combined)
-
-        return encoded
+        embedded = self.embedding(x_categorical)
+        combined = torch.cat([x_numerical, embedded], dim=1)
+        return self.mlp(combined)

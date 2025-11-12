@@ -4,55 +4,63 @@ import torch
 from torch import nn
 
 from .base import BaseModel, ModelOutput
-from ..module.encoder import NumericalEncoder, CategoricalEncoder, TabularEncoder
-from ..module.decoder import NumericalDecoder, CategoricalDecoder, TabularDecoder
+from ..module.encoder import (
+    NumericalEncoderModule,
+    CategoricalEncoderModule,
+    TabularEncoderModule,
+)
+from ..module.decoder import (
+    NumericalDecoderModule,
+    CategoricalDecoderModule,
+    TabularDecoderModule,
+)
 from . import ModelFactory
 
 
-class ModularAutoencoder(BaseModel):
-    """Generic Autoencoder with custom encoder and decoder."""
+class ComposableAutoencoder(BaseModel):
+    """Composable Autoencoder with custom encoder and decoder modules."""
 
     def __init__(
         self,
-        encoder: nn.Module,
-        decoder: nn.Module,
+        encoder_module: nn.Module,
+        decoder_module: nn.Module,
     ) -> None:
         super().__init__()
-        self.encoder = encoder
-        self.decoder = decoder
+        self.encoder_module = encoder_module
+        self.decoder_module = decoder_module
 
     def forward(self, x: torch.Tensor) -> ModelOutput:
         """Forward pass.
         Args:
             x: Input tensor
         Returns:
-            Model output with 'recon' and 'latents'
+            Model output with 'x_recon' and 'z'
         """
-        encoded = self.encoder(x)
-        recon = self.decoder(encoded)
-        return ModelOutput(recon=recon, latents=encoded)
+        z = self.encoder_module(x)
+        x_recon = self.decoder_module(z)
+        return ModelOutput(x_recon=x_recon, z=z)
 
     def for_loss(
         self,
         output: ModelOutput,
         target: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """returns reconstructed features and targets for loss computation."""
-        return output["recon"], target
+        """Returns reconstructed features and targets for loss computation."""
+        return output["x_recon"], target
 
 
-class ModularTabularAutoencoder(BaseModel):
-    """Generic Tabular Autoencoder with custom encoder and decoder."""
+class ComposableTabularAutoencoder(BaseModel):
+    """Composable Tabular Autoencoder with custom encoder and decoder modules."""
 
     def __init__(
         self,
-        encoder: nn.Module,
-        decoder: nn.Module,
+        encoder_module: nn.Module,
+        decoder_module: nn.Module,
         noise_factor: float = 0.1,
     ) -> None:
         super().__init__()
-        self.encoder = encoder
-        self.decoder = decoder
+        self.encoder_module = encoder_module
+        self.decoder_module = decoder_module
         self.noise_factor = noise_factor
 
     def _augment(
@@ -63,8 +71,8 @@ class ModularTabularAutoencoder(BaseModel):
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Data augmentation for contrastive learning.
         Args:
-            x_numerical: Tensor of shape [batch_size, n_numerical_features]
-            x_categorical: Tensor of shape [batch_size, n_categorical_features]
+            x_numerical: Tensor of shape [batch_size, num_numerical_features]
+            x_categorical: Tensor of shape [batch_size, num_categorical_features]
         Returns:
             Augmented numerical and categorical tensors.
         """
@@ -85,22 +93,22 @@ class ModularTabularAutoencoder(BaseModel):
     ) -> ModelOutput:
         """Forward pass.
         Args:
-            x_numerical: Tensor of shape [batch_size, n_numerical_features]
-            x_categorical: Tensor of shape [batch_size, n_categorical_features]
+            x_numerical: Tensor of shape [batch_size, num_numerical_features]
+            x_categorical: Tensor of shape [batch_size, num_categorical_features]
         Returns:
-            Model output with 'recon' and 'latents'
+            Model output with 'x_numerical_recon', 'x_categorical_recon', and 'z'
         """
         if self.noise_factor > 0:
             x_numerical, x_categorical = self._augment(
                 x_numerical, x_categorical, self.noise_factor
             )
 
-        encoded = self.encoder(x_numerical, x_categorical)
-        recon_numerical, recon_categorical = self.decoder(encoded)
+        z = self.encoder_module(x_numerical, x_categorical)
+        x_numerical_recon, x_categorical_recon = self.decoder_module(z)
         return ModelOutput(
-            recon_numerical=recon_numerical,
-            recon_categorical=recon_categorical,
-            latents=encoded,
+            x_numerical_recon=x_numerical_recon,
+            x_categorical_recon=x_categorical_recon,
+            z=z,
         )
 
     def for_loss(
@@ -108,18 +116,18 @@ class ModularTabularAutoencoder(BaseModel):
         output: ModelOutput,
         target_numerical: torch.Tensor,
         target_categorical: Sequence[torch.Tensor],
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """returns reconstructed features and targets for loss computation."""
-        recon_numerical, recon_categorical = (
-            output["recon_numerical"],
-            output["recon_categorical"],
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Returns reconstructed features and targets for loss computation."""
+        return (
+            output["x_numerical_recon"],
+            output["x_categorical_recon"],
+            target_numerical,
+            target_categorical,
         )
-
-        return recon_numerical, recon_categorical, target_numerical, target_categorical
 
 
 @ModelFactory.register()
-class NumericalAutoencoder(ModularAutoencoder):
+class NumericalAutoencoder(ComposableAutoencoder):
 
     def __init__(
         self,
@@ -133,7 +141,7 @@ class NumericalAutoencoder(ModularAutoencoder):
     ) -> None:
         hidden_dims = list(hidden_dims)
 
-        encoder = NumericalEncoder(
+        encoder_module = NumericalEncoderModule(
             in_features=in_features,
             out_features=latent_dim,
             hidden_dims=hidden_dims,
@@ -143,7 +151,7 @@ class NumericalAutoencoder(ModularAutoencoder):
             bias=bias,
         )
 
-        decoder = NumericalDecoder(
+        decoder_module = NumericalDecoderModule(
             in_features=latent_dim,
             out_features=in_features,
             hidden_dims=hidden_dims[::-1],
@@ -153,17 +161,16 @@ class NumericalAutoencoder(ModularAutoencoder):
             bias=bias,
         )
 
-        super().__init__(encoder=encoder, decoder=decoder)
+        super().__init__(encoder_module=encoder_module, decoder_module=decoder_module)
 
 
 @ModelFactory.register()
-class CategoricalAutoencoder(ModularAutoencoder):
+class CategoricalAutoencoder(ComposableAutoencoder):
     def __init__(
         self,
-        embed_dim: int,
         latent_dim: int,
-        num_categorical: Optional[int] = None,
-        cat_cardinalities: Optional[Sequence[int]] = None,
+        num_features: Optional[int] = None,
+        cardinalities: Optional[Sequence[int]] = None,
         max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
@@ -173,12 +180,11 @@ class CategoricalAutoencoder(ModularAutoencoder):
     ) -> None:
         hidden_dims = list(hidden_dims)
 
-        encoder = CategoricalEncoder(
-            num_categorical=num_categorical,
-            cat_cardinalities=cat_cardinalities,
-            max_emb_dim=max_emb_dim,
-            embed_dim=embed_dim,
+        encoder_module = CategoricalEncoderModule(
             out_features=latent_dim,
+            num_features=num_features,
+            cardinalities=cardinalities,
+            max_emb_dim=max_emb_dim,
             hidden_dims=hidden_dims,
             dropout=dropout,
             activation=activation,
@@ -186,11 +192,11 @@ class CategoricalAutoencoder(ModularAutoencoder):
             bias=bias,
         )
 
-        decoder = CategoricalDecoder(
-            num_categorical=num_categorical,
-            cat_cardinalities=cat_cardinalities,
-            max_emb_dim=max_emb_dim,
+        decoder_module = CategoricalDecoderModule(
             in_features=latent_dim,
+            num_features=num_features,
+            cardinalities=cardinalities,
+            max_emb_dim=max_emb_dim,
             hidden_dims=hidden_dims[::-1],
             dropout=dropout,
             activation=activation,
@@ -198,18 +204,18 @@ class CategoricalAutoencoder(ModularAutoencoder):
             bias=bias,
         )
 
-        super().__init__(encoder=encoder, decoder=decoder)
+        super().__init__(encoder_module=encoder_module, decoder_module=decoder_module)
 
 
 @ModelFactory.register()
-class TabularAutoencoder(ModularTabularAutoencoder):
+class TabularAutoencoder(ComposableTabularAutoencoder):
 
     def __init__(
         self,
-        num_numerical: int,
+        num_numerical_features: int,
         latent_dim: int,
-        num_categorical: Optional[int] = None,
-        cat_cardinalities: Optional[Sequence[int]] = None,
+        num_categorical_features: Optional[int] = None,
+        cardinalities: Optional[Sequence[int]] = None,
         max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
@@ -220,12 +226,12 @@ class TabularAutoencoder(ModularTabularAutoencoder):
     ) -> None:
         hidden_dims = list(hidden_dims)
 
-        encoder = TabularEncoder(
-            num_numerical=num_numerical,
-            num_categorical=num_categorical,
-            cat_cardinalities=cat_cardinalities,
-            max_emb_dim=max_emb_dim,
+        encoder_module = TabularEncoderModule(
+            num_numerical_features=num_numerical_features,
             out_features=latent_dim,
+            num_categorical_features=num_categorical_features,
+            cardinalities=cardinalities,
+            max_emb_dim=max_emb_dim,
             hidden_dims=hidden_dims,
             dropout=dropout,
             activation=activation,
@@ -233,12 +239,12 @@ class TabularAutoencoder(ModularTabularAutoencoder):
             bias=bias,
         )
 
-        decoder = TabularDecoder(
-            num_numerical=num_numerical,
-            num_categorical=num_categorical,
-            cat_cardinalities=cat_cardinalities,
-            max_emb_dim=max_emb_dim,
+        decoder_module = TabularDecoderModule(
             in_features=latent_dim,
+            num_numerical_features=num_numerical_features,
+            num_categorical_features=num_categorical_features,
+            cardinalities=cardinalities,
+            max_emb_dim=max_emb_dim,
             hidden_dims=hidden_dims[::-1],
             dropout=dropout,
             activation=activation,
@@ -246,18 +252,22 @@ class TabularAutoencoder(ModularTabularAutoencoder):
             bias=bias,
         )
 
-        super().__init__(encoder=encoder, decoder=decoder, noise_factor=noise_factor)
+        super().__init__(
+            encoder_module=encoder_module,
+            decoder_module=decoder_module,
+            noise_factor=noise_factor,
+        )
 
 
 @ModelFactory.register()
-class ContrastiveTabularAutoencoder(ModularTabularAutoencoder):
+class ContrastiveTabularAutoencoder(ComposableTabularAutoencoder):
 
     def __init__(
         self,
-        num_numerical: int,
+        num_numerical_features: int,
         latent_dim: int,
-        num_categorical: Optional[int] = None,
-        cat_cardinalities: Optional[Sequence[int]] = None,
+        num_categorical_features: Optional[int] = None,
+        cardinalities: Optional[Sequence[int]] = None,
         max_emb_dim: int = 50,
         hidden_dims: Sequence[int] = (),
         dropout: float = 0.0,
@@ -268,12 +278,12 @@ class ContrastiveTabularAutoencoder(ModularTabularAutoencoder):
     ) -> None:
         hidden_dims = list(hidden_dims)
 
-        encoder = TabularEncoder(
-            num_numerical=num_numerical,
-            num_categorical=num_categorical,
-            cat_cardinalities=cat_cardinalities,
-            max_emb_dim=max_emb_dim,
+        encoder_module = TabularEncoderModule(
+            num_numerical_features=num_numerical_features,
             out_features=latent_dim,
+            num_categorical_features=num_categorical_features,
+            cardinalities=cardinalities,
+            max_emb_dim=max_emb_dim,
             hidden_dims=hidden_dims,
             dropout=dropout,
             activation=activation,
@@ -281,12 +291,12 @@ class ContrastiveTabularAutoencoder(ModularTabularAutoencoder):
             bias=bias,
         )
 
-        decoder = TabularDecoder(
-            num_numerical=num_numerical,
-            num_categorical=num_categorical,
-            cat_cardinalities=cat_cardinalities,
-            max_emb_dim=max_emb_dim,
+        decoder_module = TabularDecoderModule(
             in_features=latent_dim,
+            num_numerical_features=num_numerical_features,
+            num_categorical_features=num_categorical_features,
+            cardinalities=cardinalities,
+            max_emb_dim=max_emb_dim,
             hidden_dims=hidden_dims[::-1],
             dropout=dropout,
             activation=activation,
@@ -294,31 +304,39 @@ class ContrastiveTabularAutoencoder(ModularTabularAutoencoder):
             bias=bias,
         )
 
-        super().__init__(encoder=encoder, decoder=decoder, noise_factor=noise_factor)
+        super().__init__(
+            encoder_module=encoder_module,
+            decoder_module=decoder_module,
+            noise_factor=noise_factor,
+        )
 
     def forward(
         self, x_numerical: torch.Tensor, x_categorical: torch.Tensor
     ) -> ModelOutput:
         """Forward pass with contrastive augmentations.
         Args:
-            x_numerical: Tensor of shape [batch_size, n_numerical_features]
-            x_categorical: Tensor of shape [batch_size, n_categorical_features]
+            x_numerical: Tensor of shape [batch_size, num_numerical_features]
+            x_categorical: Tensor of shape [batch_size, num_categorical_features]
         Returns:
-            Model output with 'recon', 'latents', 'z1', and 'z2'
+            Model output with 'x_numerical_recon', 'x_categorical_recon', 'z', 'z1', and 'z2'
         """
-        x1_num, x1_cat = self._augment(x_numerical, x_categorical, self.noise_factor)
-        x2_num, x2_cat = self._augment(x_numerical, x_categorical, self.noise_factor)
-        z1 = self.encoder(x1_num, x1_cat)
-        z2 = self.encoder(x2_num, x2_cat)
+        x1_numerical, x1_categorical = self._augment(
+            x_numerical, x_categorical, self.noise_factor
+        )
+        x2_numerical, x2_categorical = self._augment(
+            x_numerical, x_categorical, self.noise_factor
+        )
+        z1 = self.encoder_module(x1_numerical, x1_categorical)
+        z2 = self.encoder_module(x2_numerical, x2_categorical)
 
-        # Reconstruction (originale)
-        z_orig = self.encoder(x_numerical, x_categorical)
-        recon_num, recon_cat = self.decoder(z_orig)
+        # Reconstruction (original)
+        z = self.encoder_module(x_numerical, x_categorical)
+        x_numerical_recon, x_categorical_recon = self.decoder_module(z)
 
         return ModelOutput(
-            recon_numerical=recon_num,
-            recon_categorical=recon_cat,
-            latents=z_orig,
+            x_numerical_recon=x_numerical_recon,
+            x_categorical_recon=x_categorical_recon,
+            z=z,
             z1=z1,
             z2=z2,
         )
@@ -328,19 +346,20 @@ class ContrastiveTabularAutoencoder(ModularTabularAutoencoder):
         output: ModelOutput,
         target_numerical: torch.Tensor,
         target_categorical: Sequence[torch.Tensor],
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """returns augmented latents and reconstructions for loss computation."""
-
-        recon_numerical, recon_categorical = (
-            output["recon_numerical"],
-            output["recon_categorical"],
-        )
-
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
+        """Returns augmented latents and reconstructions for loss computation."""
         return (
             output["z1"],
             output["z2"],
-            recon_numerical,
-            recon_categorical,
+            output["x_numerical_recon"],
+            output["x_categorical_recon"],
             target_numerical,
             target_categorical,
         )

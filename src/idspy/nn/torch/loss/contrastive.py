@@ -9,65 +9,73 @@ from . import LossFactory
 
 
 @LossFactory.register()
-class SupConLoss(BaseLoss):
+class SupervisedContrastiveLoss(BaseLoss):
 
     def __init__(
         self,
         reduction: str = "mean",
         ignore_index: int = -1,
-        tau: float = 0.07,
+        temperature: float = 0.07,
     ) -> None:
         """Initialize supervised contrastive loss.
 
         Args:
             reduction: How to reduce the loss ('mean', 'sum', 'none')
             ignore_index: Index to ignore in loss calculation
-            tau: Temperature scaling factor
+            temperature: Temperature scaling factor
         """
         super().__init__(reduction)
         self.ignore_index = ignore_index
-        self.tau = tau
+        self.temperature = temperature
 
     def forward(
         self,
-        x: Tensor,
+        z: Tensor,
         target: Tensor,
     ) -> Tensor:
         """Compute supervised contrastive loss.
 
         Args:
-            x: Logits tensor [batch_size, num_classes]
+            z: Embedding tensor [batch_size, embedding_dim]
             target: Target class indices [batch_size]
 
         Returns:
             Loss tensor (scalar or per-sample based on reduction)
         """
-        x = F.normalize(x, dim=1)
-        N = x.shape[0]
+        z = F.normalize(z, dim=1)
+        batch_size = z.shape[0]
 
-        sim = (x @ x.T) / self.tau
+        # Compute similarity matrix
+        similarity = (z @ z.T) / self.temperature
 
         # Mask self-similarities to -inf
-        mask_self = torch.eye(N, dtype=torch.bool, device=x.device)
-        sim = sim.masked_fill(mask_self, float("-inf"))
+        self_mask = torch.eye(batch_size, dtype=torch.bool, device=z.device)
+        similarity = similarity.masked_fill(self_mask, float("-inf"))
 
         # Create positive mask based on target labels
-        mask_pos = target.unsqueeze(0) == target.unsqueeze(1)
-        mask_pos = mask_pos.masked_fill(mask_self, False)
+        positive_mask = target.unsqueeze(0) == target.unsqueeze(1)
+        positive_mask = positive_mask.masked_fill(self_mask, False)
 
-        valid = target != self.ignore_index
-        mask_pos = mask_pos & valid.unsqueeze(0) & valid.unsqueeze(1)
+        # Filter out ignored indices
+        valid_mask = target != self.ignore_index
+        positive_mask = (
+            positive_mask & valid_mask.unsqueeze(0) & valid_mask.unsqueeze(1)
+        )
 
         # Count the number of positive pairs for each sample
-        num_pos = mask_pos.sum(dim=1)
+        num_positives = positive_mask.sum(dim=1)
 
-        valid_samples = num_pos > 0  # Samples with at least one positive pair
+        # Only compute loss for samples with at least one positive pair
+        valid_samples = num_positives > 0
         if not valid_samples.any():
-            return torch.tensor(0.0, device=x.device, requires_grad=True)
+            return torch.tensor(0.0, device=z.device, requires_grad=True)
 
-        log_prob = F.log_softmax(sim, dim=1)
-        log_prob_pos = (log_prob * mask_pos).sum(dim=1)  # sum over positives
-        loss = -log_prob_pos[valid_samples] / num_pos[valid_samples]
+        # Compute log probabilities and sum over positives
+        log_probs = F.log_softmax(similarity, dim=1)
+        log_probs_positive = (log_probs * positive_mask).sum(dim=1)
+
+        # Average over positive pairs
+        loss = -log_probs_positive[valid_samples] / num_positives[valid_samples]
 
         return self._reduce(loss)
 
@@ -78,54 +86,60 @@ class NtXentLoss(BaseLoss):
     def __init__(
         self,
         reduction: str = "mean",
-        tau: float = 0.07,
+        temperature: float = 0.07,
     ) -> None:
-        """Initialize NT-Xent loss. An unsupervised contrastive loss.
+        """Initialize NT-Xent (Normalized Temperature-scaled Cross Entropy) loss.
+
+        An unsupervised contrastive loss for self-supervised learning.
 
         Args:
             reduction: How to reduce the loss ('mean', 'sum', 'none')
-            tau: Temperature scaling factor
+            temperature: Temperature scaling factor
         """
         super().__init__(reduction)
-        self.tau = tau
+        self.temperature = temperature
 
     def forward(
         self,
-        x1: Tensor,
-        x2: Tensor,
+        z1: Tensor,
+        z2: Tensor,
         *args,
     ) -> Tensor:
         """Compute NT-Xent loss.
 
         Args:
-            x1: First set of embeddings [batch_size, embedding_dim]
-            x2: Second set of embeddings [batch_size, embedding_dim]
+            z1: First set of embeddings [batch_size, embedding_dim]
+            z2: Second set of embeddings [batch_size, embedding_dim]
 
         Returns:
             Loss tensor (scalar or per-sample based on reduction)
         """
-        x1 = F.normalize(x1, dim=1)
-        x2 = F.normalize(x2, dim=1)
+        z1 = F.normalize(z1, dim=1)
+        z2 = F.normalize(z2, dim=1)
 
-        N = x1.shape[0]
+        batch_size = z1.shape[0]
 
-        x = torch.cat([x1, x2], dim=0)  # [2*batch_size, embedding_dim]
+        # Concatenate both views
+        z = torch.cat([z1, z2], dim=0)  # [2*batch_size, embedding_dim]
 
-        sim = (x @ x.T) / self.tau
+        # Compute similarity matrix
+        similarity = (z @ z.T) / self.temperature
 
         # Mask self-similarities to -inf
-        mask_self = torch.eye(2 * N, dtype=torch.bool, device=x.device)
-        sim = sim.masked_fill(mask_self, float("-inf"))
+        self_mask = torch.eye(2 * batch_size, dtype=torch.bool, device=z.device)
+        similarity = similarity.masked_fill(self_mask, float("-inf"))
 
         # Create positive mask for augmented pairs
-        mask_pos = torch.zeros_like(sim, dtype=torch.bool)
-        for i in range(N):
-            mask_pos[i, i + N] = True
-            mask_pos[i + N, i] = True
+        positive_mask = torch.zeros_like(similarity, dtype=torch.bool)
+        for i in range(batch_size):
+            positive_mask[i, i + batch_size] = True
+            positive_mask[i + batch_size, i] = True
 
-        log_prob = F.log_softmax(sim, dim=1)
-        log_prob_pos = (log_prob * mask_pos).sum(dim=1)  # sum over positives
+        # Compute log probabilities and sum over positives
+        log_probs = F.log_softmax(similarity, dim=1)
+        log_probs_positive = (log_probs * positive_mask).sum(dim=1)
 
-        loss = -log_prob_pos / 1  # each sample has one positive
+        # Each sample has exactly one positive pair
+        loss = -log_probs_positive
 
         return self._reduce(loss)

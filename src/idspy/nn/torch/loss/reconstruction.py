@@ -2,8 +2,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from torch import Tensor
 import torch
+from torch import Tensor
 import torch.nn.functional as F
 
 from .base import BaseLoss
@@ -29,18 +29,18 @@ class NumericalReconstructionLoss(BaseLoss):
 
     def forward(
         self,
-        x: Tensor,
+        x_recon: Tensor,
         target: Tensor,
     ) -> Tensor:
         """Compute reconstruction loss.
 
         Args:
-            x: Reconstructed features [batch_size, num_features]
+            x_recon: Reconstructed features [batch_size, num_features]
             target: Original features [batch_size, num_features]
         Returns:
             Loss tensor (scalar or per-sample based on reduction)
         """
-        loss = F.mse_loss(x, target, reduction="none")
+        loss = F.mse_loss(x_recon, target, reduction="none")
         loss = loss.mean(dim=-1)  # Average over features
         return self._reduce(loss)
 
@@ -62,27 +62,27 @@ class CategoricalReconstructionLoss(BaseLoss):
 
     def forward(
         self,
-        x: Tensor,
+        x_recon: Tensor,
         target: Tensor,
     ) -> Tensor:
         """Compute categorical reconstruction loss.
 
         Args:
-            x: Tensor of shape [batch_size, num_categorical, max_cardinality] with logits
+            x_recon: Tensor of shape [batch_size, num_categorical, max_cardinality] with logits
             target: Tensor of shape [batch_size, num_categorical] with true class indices
 
         Returns:
             Loss tensor (scalar or per-sample based on reduction)
         """
-        # Reshape x to [batch_size * num_categorical, max_cardinality]
-        batch_size, num_categorical, max_cardinality = x.shape
-        x_reshaped = x.view(-1, max_cardinality)
+        # Reshape x_recon to [batch_size * num_categorical, max_cardinality]
+        batch_size, num_categorical, max_cardinality = x_recon.shape
+        x_recon_flat = x_recon.view(-1, max_cardinality)
 
         # Reshape target to [batch_size * num_categorical]
-        target_reshaped = target.view(-1).long()
+        target_flat = target.view(-1).long()
 
         # Compute cross entropy loss
-        loss = F.cross_entropy(x_reshaped, target_reshaped, reduction="none")
+        loss = F.cross_entropy(x_recon_flat, target_flat, reduction="none")
 
         # Reshape back to [batch_size, num_categorical]
         loss = loss.view(batch_size, num_categorical)
@@ -148,24 +148,26 @@ class TabularReconstructionLoss(BaseLoss):
 
     def forward(
         self,
-        x_numerical: Tensor,
-        x_categorical: Tensor,
+        x_numerical_recon: Tensor,
+        x_categorical_recon: Tensor,
         target_numerical: Tensor,
         target_categorical: Tensor,
     ) -> Tensor:
         """Compute combined reconstruction loss with uncertainty-based weighting.
 
         Args:
-            x_numerical: Reconstructed numerical features [batch_size, num_numerical]
-            x_categorical: Tensor of shape [batch_size, num_categorical, max_cardinality] with logits
+            x_numerical_recon: Reconstructed numerical features [batch_size, num_numerical]
+            x_categorical_recon: Tensor of shape [batch_size, num_categorical, max_cardinality] with logits
             target_numerical: Original numerical features [batch_size, num_numerical]
             target_categorical: Original categorical features [batch_size, num_categorical]
 
         Returns:
             Weighted combination of numeric and categorical losses with uncertainty regularization
         """
-        numerical_loss = self.numerical_loss(x_numerical, target_numerical)
-        categorical_loss = self.categorical_loss(x_categorical, target_categorical)
+        numerical_loss = self.numerical_loss(x_numerical_recon, target_numerical)
+        categorical_loss = self.categorical_loss(
+            x_categorical_recon, target_categorical
+        )
 
         # Clamp sigmas to prevent collapse or explosion
         numerical_sigma = torch.clamp(
@@ -176,19 +178,19 @@ class TabularReconstructionLoss(BaseLoss):
         )
 
         # Compute log-variance from sigma: log(σ²) = 2*log(σ)
-        log_var_numerical = 2 * torch.log(numerical_sigma)
-        log_var_categorical = 2 * torch.log(categorical_sigma)
+        numerical_log_var = 2 * torch.log(numerical_sigma)
+        categorical_log_var = 2 * torch.log(categorical_sigma)
 
         # Homoscedastic uncertainty weighting
         # Loss = (1/2σ²) * L + (1/2) * log(σ²)
-        numerical_precision = torch.exp(-log_var_numerical)
-        categorical_precision = torch.exp(-log_var_categorical)
+        numerical_precision = torch.exp(-numerical_log_var)
+        categorical_precision = torch.exp(-categorical_log_var)
 
         loss = (
             numerical_precision * numerical_loss
             + categorical_precision * categorical_loss
-            + 0.5 * log_var_numerical
-            + 0.5 * log_var_categorical
+            + 0.5 * numerical_log_var
+            + 0.5 * categorical_log_var
         )
 
         return self._reduce(loss)
@@ -204,16 +206,16 @@ class TabularReconstructionLoss(BaseLoss):
         )
 
         # Compute log-variance for reporting
-        log_var_numerical = 2 * torch.log(numerical_sigma)
-        log_var_categorical = 2 * torch.log(categorical_sigma)
+        numerical_log_var = 2 * torch.log(numerical_sigma)
+        categorical_log_var = 2 * torch.log(categorical_sigma)
 
         return {
             "numerical_sigma": numerical_sigma.item(),
             "categorical_sigma": categorical_sigma.item(),
-            "numerical_log_variance": log_var_numerical.item(),
-            "categorical_log_variance": log_var_categorical.item(),
-            "numerical_precision": torch.exp(-log_var_numerical).item(),
-            "categorical_precision": torch.exp(-log_var_categorical).item(),
+            "numerical_log_variance": numerical_log_var.item(),
+            "categorical_log_variance": categorical_log_var.item(),
+            "numerical_precision": torch.exp(-numerical_log_var).item(),
+            "categorical_precision": torch.exp(-categorical_log_var).item(),
         }
 
     def save_parameters(self, path: Optional[str] = None) -> None:
