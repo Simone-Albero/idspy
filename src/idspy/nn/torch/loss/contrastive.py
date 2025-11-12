@@ -78,18 +78,15 @@ class NtXentLoss(BaseLoss):
     def __init__(
         self,
         reduction: str = "mean",
-        ignore_index: int = -1,
         tau: float = 0.07,
     ) -> None:
         """Initialize NT-Xent loss. An unsupervised contrastive loss.
 
         Args:
             reduction: How to reduce the loss ('mean', 'sum', 'none')
-            ignore_index: Index to ignore in loss calculation
             tau: Temperature scaling factor
         """
         super().__init__(reduction)
-        self.ignore_index = ignore_index
         self.tau = tau
 
     def forward(
