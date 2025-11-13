@@ -6,8 +6,8 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.metrics import (
     silhouette_score,
-    calinski_harabasz_score,
-    davies_bouldin_score,
+    adjusted_rand_score,
+    homogeneity_completeness_v_measure,
 )
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.neighbors import NearestNeighbors
@@ -114,24 +114,29 @@ def inter_class_separation(X: np.ndarray, labels: np.ndarray) -> float:
 
 
 @StepFactory.register()
-@Step.needs("vectors", "labels")
+@Step.needs("vectors", "labels", "ground_truth")
 class ClusteringMetrics(Step):
     """Compute clustering metrics for latent space clusterability analysis.
 
     Metrics computed:
     - Hopkins: measures clustering tendency (closer to 1 = more clusterable)
     - Silhouette: measures separation quality using true labels (-1 to 1, higher is better)
-    - Calinski-Harabasz: ratio of between/within cluster variance (higher is better)
-    - Davies-Bouldin: average similarity between clusters (lower is better)
     - Class Separation: ratio of between-class to within-class variance (higher is better)
     - Intra-class Cohesion: average cosine similarity within classes (0 to 1, higher is better)
     - Inter-class Separation: average distance between class centroids (higher is better)
+
+    If ground truth labels provided, also computes comparison metrics:
+    - ARI: Adjusted Rand Index (-1 to 1, higher is better)
+    - V-measure: harmonic mean of homogeneity and completeness (0 to 1, higher is better)
+    - Homogeneity: each cluster contains only members of a single class (0 to 1, higher is better)
+    - Completeness: all members of a class are in the same cluster (0 to 1, higher is better)
     """
 
     def __init__(
         self,
         vectors_key: str = "vectors",
         labels_key: str = "labels",
+        ground_truth_key: Optional[str] = None,
         metrics_key: str = "clustering_scores",
         scale_inputs: bool = True,
         pca_components: int = 16,
@@ -140,17 +145,23 @@ class ClusteringMetrics(Step):
         super().__init__(name=name or "compute_clustering_scores")
         self.scale_inputs = scale_inputs
         self.pca_components = pca_components
+        self.ground_truth_key = ground_truth_key
         self.key_map = {
             "vectors": vectors_key,
             "labels": labels_key,
             "outputs": metrics_key,
         }
+        if ground_truth_key:
+            self.key_map["ground_truth"] = ground_truth_key
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
     def compute(
-        self, vectors: np.ndarray, labels: np.ndarray
+        self,
+        vectors: np.ndarray,
+        labels: np.ndarray,
+        ground_truth: Optional[np.ndarray] = None,
     ) -> Optional[Dict[str, Any]]:
 
         if self.scale_inputs:
@@ -174,12 +185,6 @@ class ClusteringMetrics(Step):
         logger.info("Computing Silhouette score...")
         scores["Silhouette"] = silhouette_score(X_compressed, labels)
 
-        logger.info("Computing Calinski-Harabasz score...")
-        scores["Calinski-Harabasz"] = calinski_harabasz_score(X_compressed, labels)
-
-        logger.info("Computing Davies-Bouldin score...")
-        scores["Davies-Bouldin"] = davies_bouldin_score(X_compressed, labels)
-
         # Custom metrics
         logger.info("Computing class separation...")
         scores["Class Separation"] = class_separation_score(X_compressed, labels)
@@ -189,6 +194,19 @@ class ClusteringMetrics(Step):
 
         logger.info("Computing inter-class separation...")
         scores["Inter-class Separation"] = inter_class_separation(X_compressed, labels)
+
+        # Ground truth comparison metrics
+        if ground_truth is not None:
+            logger.info("Computing ground truth comparison metrics...")
+
+            scores["ARI"] = adjusted_rand_score(ground_truth, labels)
+
+            homogeneity, completeness, v_measure = homogeneity_completeness_v_measure(
+                ground_truth, labels
+            )
+            scores["V-measure (considering ground truth)"] = v_measure
+            scores["Homogeneity (considering ground truth)"] = homogeneity
+            scores["Completeness (considering ground truth)"] = completeness
 
         return {
             "outputs": {
