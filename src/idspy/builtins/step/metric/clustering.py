@@ -178,35 +178,25 @@ class ClusteringMetrics(Step):
         scores = {}
 
         # Hopkins statistic (clustering tendency)
-        logger.info("Computing Hopkins statistic...")
+        logger.info("Computing clustering statistic...")
         scores["Hopkins"] = hopkins_statistic(X_compressed)
-
-        # Metrics based on true labels
-        logger.info("Computing Silhouette score...")
         scores["Silhouette"] = silhouette_score(X_compressed, labels)
-
-        # Custom metrics
-        logger.info("Computing class separation...")
         scores["Class Separation"] = class_separation_score(X_compressed, labels)
-
-        logger.info("Computing intra-class cohesion...")
         scores["Intra-class Cohesion"] = intra_class_cohesion(X_compressed, labels)
-
-        logger.info("Computing inter-class separation...")
         scores["Inter-class Separation"] = inter_class_separation(X_compressed, labels)
 
         # Ground truth comparison metrics
         if ground_truth is not None:
             logger.info("Computing ground truth comparison metrics...")
 
-            scores["ARI"] = adjusted_rand_score(ground_truth, labels)
+            scores["ARI (GT)"] = adjusted_rand_score(ground_truth, labels)
 
             homogeneity, completeness, v_measure = homogeneity_completeness_v_measure(
                 ground_truth, labels
             )
-            scores["V-measure (considering ground truth)"] = v_measure
-            scores["Homogeneity (considering ground truth)"] = homogeneity
-            scores["Completeness (considering ground truth)"] = completeness
+            scores["V-measure (GT)"] = v_measure
+            scores["Homogeneity (GT)"] = homogeneity
+            scores["Completeness (GT)"] = completeness
 
         return {
             "outputs": {
