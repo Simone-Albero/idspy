@@ -59,17 +59,21 @@ class Downsample(Step):
 
     def __init__(
         self,
-        frac: float,
+        n_samples: int,
         class_col: Optional[str] = None,
+        fair: bool = False,
         df_key: str = "data.base_df",
         random_state: Optional[int] = None,
         name: Optional[str] = None,
     ) -> None:
-        if not (0.0 < frac <= 1.0):
-            raise ValueError(f"downsample: frac must be in (0, 1], got {frac}.")
+        if n_samples <= 0:
+            raise ValueError(
+                f"downsample: n_samples must be positive, got {n_samples}."
+            )
 
-        self.frac = frac
+        self.n_samples = n_samples
         self.class_col = class_col
+        self.fair = fair
         self.random_state = random_state
 
         super().__init__(name=name or "downsample")
@@ -86,14 +90,37 @@ class Downsample(Step):
             return {"df": df}
 
         if self.class_col is not None and self.class_col in df.columns:
-            sampled = df.groupby(
-                self.class_col, dropna=False, group_keys=False, sort=False
-            ).sample(frac=self.frac, replace=False, random_state=self.random_state)
+            if self.fair:
+                # Fair sampling: equal samples per class
+                counts = df[self.class_col].value_counts(dropna=False)
+                n_classes = len(counts)
+                samples_per_class = self.n_samples // n_classes
+
+                if samples_per_class <= 0:
+                    sampled = df.iloc[0:0]  # empty but keep schema
+                    return {"df": reattach_meta(df, sampled)}
+
+                # Sample each class, taking min of requested and available
+                sampled = df.groupby(
+                    self.class_col, dropna=False, group_keys=False, sort=False
+                ).sample(
+                    n=lambda x: min(len(x), samples_per_class),
+                    replace=False,
+                    random_state=self.random_state,
+                )
+            else:
+                # Proportional sampling: maintain class distribution
+                frac = self.n_samples / len(df)
+                if frac > 1.0:
+                    frac = 1.0
+
+                sampled = df.groupby(
+                    self.class_col, dropna=False, group_keys=False, sort=False
+                ).sample(frac=frac, replace=False, random_state=self.random_state)
         else:
             # Global sampling (handles both None class_column and missing column cases)
-            sampled = df.sample(
-                frac=self.frac, replace=False, random_state=self.random_state
-            )
+            n = min(self.n_samples, len(df))
+            sampled = df.sample(n=n, replace=False, random_state=self.random_state)
 
         return {"df": reattach_meta(df, sampled)}
 
