@@ -105,26 +105,37 @@ def vectors_plot(vectors: np.ndarray, colors: list | np.ndarray) -> plt.Figure:
     colors_array = np.asarray(colors)
     unique_labels = np.unique(colors_array)
 
-    # Create scatter plot
+    # Normalize colors to [0, 1] range for heatmap
+    color_values = (
+        (colors_array - colors_array.min()) / (colors_array.max() - colors_array.min())
+        if colors_array.max() > colors_array.min()
+        else colors_array
+    )
+
+    # Create scatter plot with heatmap coloring
     if is_3d:
         scatter = ax.scatter(
             vectors[:, 0],
             vectors[:, 1],
             vectors[:, 2],
-            c=colors_array,
-            cmap="tab10",
+            c=color_values,
+            cmap="viridis",
             s=50,
             alpha=0.7,
+            vmin=0,
+            vmax=1,
         )
         ax.set_zlabel("Z")
     else:
         scatter = ax.scatter(
             vectors[:, 0],
             vectors[:, 1],
-            c=colors_array,
-            cmap="tab10",
+            c=color_values,
+            cmap="viridis",
             s=50,
             alpha=0.7,
+            vmin=0,
+            vmax=1,
         )
 
     # Set labels
@@ -132,26 +143,20 @@ def vectors_plot(vectors: np.ndarray, colors: list | np.ndarray) -> plt.Figure:
     ax.set_ylabel("Y")
     ax.set_title(f"{n_features}D Vector Plot")
 
-    # Add legend with correct label-color correspondence
-    handles = []
-    for label in unique_labels:
-        # Get the color for this label from the colormap
-        color_idx = label % 10  # tab10 has 10 colors
-        color = plt.cm.tab10(color_idx / 10.0)
-        handles.append(
-            plt.Line2D(
-                [0],
-                [0],
-                marker="o",
-                color="w",
-                markerfacecolor=color,
-                markersize=8,
-                label=f"Class {int(label)}",
-            )
-        )
+    # Add colorbar with discrete labels
+    cbar = plt.colorbar(scatter, ax=ax, pad=0.1)
+    cbar.set_label("Class", rotation=270, labelpad=20)
 
-    legend = ax.legend(handles=handles, title="Classes", loc="best")
-    legend.set_draggable(True)
+    # Set colorbar ticks at the actual label positions
+    if len(unique_labels) <= 10:
+        tick_positions = (
+            (unique_labels - colors_array.min())
+            / (colors_array.max() - colors_array.min())
+            if colors_array.max() > colors_array.min()
+            else unique_labels
+        )
+        cbar.set_ticks(tick_positions)
+        cbar.set_ticklabels([f"{int(label)}" for label in unique_labels])
 
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
