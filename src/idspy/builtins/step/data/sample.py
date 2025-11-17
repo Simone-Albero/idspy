@@ -59,7 +59,7 @@ class Downsample(Step):
 
     def __init__(
         self,
-        n_samples: int,
+        n_samples: Optional[int] = None,
         class_col: Optional[str] = None,
         fair: bool = False,
         df_key: str = "data.base_df",
@@ -87,6 +87,9 @@ class Downsample(Step):
     def compute(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
 
         if df.empty:
+            return {"df": df}
+
+        if self.n_samples is None:
             return {"df": df}
 
         if self.class_col is not None and self.class_col in df.columns:
