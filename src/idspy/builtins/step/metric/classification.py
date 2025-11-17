@@ -2,25 +2,28 @@ from typing import Optional, Dict, Any
 
 import numpy as np
 from sklearn.metrics import roc_curve, auc
+from scipy.stats import kurtosis, skew
+from torch import nn
 
 from ....core.step.base import Step
 from ....plot.array import confusion_matrix_to_plot, roc_auc_plot, distribution_plot
-from ....plot.dict import dict_to_bar_plot
+from ....plot.dict import dict_to_bar_plot, dict_to_table
 from .. import StepFactory
 
 
 @StepFactory.register()
-@Step.needs("predictions", "confidences", "labels")
+@Step.needs("predictions", "confidences", "labels", "model")
 class SupervisedClassificationMetrics(Step):
     """Compute metrics for multiclass classification."""
 
     def __init__(
         self,
-        name: Optional[str] = None,
         predictions_key: str = "predictions",
         confidences_key: str = "confidences",
         labels_key: str = "labels",
         metrics_key: str = "classification_metrics",
+        model_key: Optional[str] = None,
+        name: Optional[str] = None,
     ) -> None:
 
         super().__init__(name=name or "classification_metrics")
@@ -30,11 +33,13 @@ class SupervisedClassificationMetrics(Step):
             "labels": labels_key,
             "metrics": metrics_key,
         }
+        if model_key:
+            self.key_map["model"] = model_key
 
     def bindings(self) -> Dict[str, str]:
         return self.key_map
 
-    def _compute_metrics(
+    def _compute_classification_metrics(
         self, y_pred: np.ndarray, y_true: np.ndarray
     ) -> Dict[str, Any]:
         """Compute classification metrics."""
@@ -80,10 +85,48 @@ class SupervisedClassificationMetrics(Step):
 
         return metrics
 
+    def _compute_weight_metrics(self, model: Any) -> Dict[str, Any]:
+        """Compute metrics from model weights for architecture comparison."""
+        weight_metrics = {}
+
+        weights = []
+        if hasattr(model, "parameters"):
+            weights = [
+                p.detach().cpu().numpy().flatten()
+                for p in model.parameters()
+                if p.requires_grad
+            ]
+
+        if weights:
+            all_weights = np.concatenate(weights)
+
+            weight_metrics["weight_mean"] = float(np.mean(all_weights))
+            weight_metrics["weight_std"] = float(np.std(all_weights))
+            weight_metrics["weight_median"] = float(np.median(all_weights))
+
+            weight_metrics["weight_l2_norm"] = float(
+                np.sqrt(np.sum(all_weights**2))
+            )  # Overall magnitude of weights
+            weight_metrics["weight_sparsity"] = float(
+                np.sum(np.abs(all_weights) < 1e-6) / len(all_weights)
+            )  # Fraction of near-zero weights
+            weight_metrics["weight_kurtosis"] = float(
+                kurtosis(all_weights)
+            )  # "tailedness" of weight distribution
+            weight_metrics["weight_skewness"] = float(
+                skew(all_weights)
+            )  # Asymmetry of weight distribution
+
+        return weight_metrics
+
     def compute(
-        self, predictions: np.ndarray, confidences: np.ndarray, labels: np.ndarray
+        self,
+        predictions: np.ndarray,
+        confidences: np.ndarray,
+        labels: np.ndarray,
+        model: Optional[nn.Module] = None,
     ) -> Optional[Dict[str, Any]]:
-        metrics = self._compute_metrics(predictions, labels)
+        metrics = self._compute_classification_metrics(predictions, labels)
         metrics["confidence_distribution"] = distribution_plot(
             confidences,
             bins=10,
@@ -91,6 +134,10 @@ class SupervisedClassificationMetrics(Step):
             x_range=(0, 1),
             log_scale=True,
         )
+        if model is not None:
+            weight_metrics = self._compute_weight_metrics(model)
+            metrics["weight_metrics"] = dict_to_table(weight_metrics)
+
         return {"metrics": metrics}
 
 
@@ -100,10 +147,10 @@ class UnsupervisedClassificationMetrics(Step):
 
     def __init__(
         self,
-        name: Optional[str] = None,
         predictions_key: str = "predictions",
         labels_key: str = "labels",
         metrics_key: str = "roc_auc_metrics",
+        name: Optional[str] = None,
     ) -> None:
 
         super().__init__(name=name or "unsupervised_classification_metrics")
