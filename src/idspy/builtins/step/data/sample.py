@@ -89,15 +89,14 @@ class Downsample(Step):
         if df.empty:
             return {"df": df}
 
-        if self.n_samples is None:
-            return {"df": df}
-
         if self.class_col is not None and self.class_col in df.columns:
             if self.fair:
                 # Fair sampling: equal samples per class
                 counts = df[self.class_col].value_counts(dropna=False)
                 n_classes = len(counts)
-                samples_per_class = self.n_samples // n_classes
+                samples_per_class = (
+                    self.n_samples // n_classes if self.n_samples else min(counts)
+                )
 
                 if samples_per_class <= 0:
                     sampled = df.iloc[0:0]  # empty but keep schema
