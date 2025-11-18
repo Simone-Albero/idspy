@@ -106,16 +106,16 @@ class SupervisedClassificationMetrics(Step):
 
             weight_metrics["weight_l2_norm"] = float(
                 np.sqrt(np.sum(all_weights**2))
-            )  # Overall magnitude of weights
+            )  # Overall magnitude of weights (Learning rate effects)
             weight_metrics["weight_sparsity"] = float(
                 np.sum(np.abs(all_weights) < 1e-6) / len(all_weights)
-            )  # Fraction of near-zero weights
+            )  # Fraction of near-zero weights (Sparsity level)
             weight_metrics["weight_kurtosis"] = float(
                 kurtosis(all_weights)
-            )  # "tailedness" of weight distribution
+            )  # "tailedness" of weight distribution (Did training produce outlier weights?)
             weight_metrics["weight_skewness"] = float(
                 skew(all_weights)
-            )  # Asymmetry of weight distribution
+            )  # Asymmetry of weight distribution (Is there a directional bias?)
 
         return weight_metrics
 

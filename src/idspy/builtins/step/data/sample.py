@@ -66,7 +66,7 @@ class Downsample(Step):
         random_state: Optional[int] = None,
         name: Optional[str] = None,
     ) -> None:
-        if n_samples <= 0:
+        if n_samples is not None and n_samples <= 0:
             raise ValueError(
                 f"downsample: n_samples must be positive, got {n_samples}."
             )
@@ -112,7 +112,7 @@ class Downsample(Step):
                 )
             else:
                 # Proportional sampling: maintain class distribution
-                frac = self.n_samples / len(df)
+                frac = self.n_samples / len(df) if self.n_samples else 1.0
                 if frac > 1.0:
                     frac = 1.0
 
