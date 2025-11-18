@@ -103,13 +103,19 @@ class Downsample(Step):
                     return {"df": reattach_meta(df, sampled)}
 
                 # Sample each class, taking min of requested and available
-                sampled = df.groupby(
+                sampled_frames = []
+                for class_val, group in df.groupby(
                     self.class_col, dropna=False, group_keys=False, sort=False
-                ).sample(
-                    n=lambda x: min(len(x), samples_per_class),
-                    replace=False,
-                    random_state=self.random_state,
-                )
+                ):
+                    n_to_sample = min(len(group), samples_per_class)
+                    sampled_frames.append(
+                        group.sample(
+                            n=n_to_sample,
+                            replace=False,
+                            random_state=self.random_state,
+                        )
+                    )
+                sampled = pd.concat(sampled_frames, ignore_index=False)
             else:
                 # Proportional sampling: maintain class distribution
                 frac = self.n_samples / len(df) if self.n_samples else 1.0
@@ -121,7 +127,7 @@ class Downsample(Step):
                 ).sample(frac=frac, replace=False, random_state=self.random_state)
         else:
             # Global sampling (handles both None class_column and missing column cases)
-            n = min(self.n_samples, len(df))
+            n = min(self.n_samples if self.n_samples else len(df), len(df))
             sampled = df.sample(n=n, replace=False, random_state=self.random_state)
 
         return {"df": reattach_meta(df, sampled)}
