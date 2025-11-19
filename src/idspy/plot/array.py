@@ -101,62 +101,96 @@ def vectors_plot(vectors: np.ndarray, colors: list | np.ndarray) -> plt.Figure:
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d" if is_3d else None)
 
-    # Convert colors to numpy array for easier handling
+    # Convert colors to numpy array
     colors_array = np.asarray(colors)
     unique_labels = np.unique(colors_array)
+    n_classes = len(unique_labels)
 
-    # Normalize colors to [0, 1] range for heatmap
-    color_values = (
-        (colors_array - colors_array.min()) / (colors_array.max() - colors_array.min())
-        if colors_array.max() > colors_array.min()
-        else colors_array
-    )
+    # Choose appropriate colormap based on number of classes
+    if n_classes <= 10:
+        cmap = plt.cm.tab10
+    elif n_classes <= 20:
+        cmap = plt.cm.tab20
+    else:
+        cmap = plt.cm.gist_ncar  # Good for many distinct colors
 
-    # Create scatter plot with heatmap coloring
+    # Map each label to a color index
+    label_to_idx = {label: idx for idx, label in enumerate(unique_labels)}
+    color_indices = np.array([label_to_idx[c] for c in colors_array])
+
+    # Normalize color indices to [0, 1] for colormap
+    if n_classes > 1:
+        color_values = color_indices / (n_classes - 1)
+    else:
+        color_values = color_indices * 0
+
+    # Create scatter plot
     if is_3d:
         scatter = ax.scatter(
             vectors[:, 0],
             vectors[:, 1],
             vectors[:, 2],
             c=color_values,
-            cmap="viridis",
+            cmap=cmap,
             s=50,
-            alpha=0.7,
+            alpha=0.8,
+            edgecolors="black",
+            linewidths=0.5,
             vmin=0,
             vmax=1,
         )
-        ax.set_zlabel("Z")
+        ax.set_zlabel("Z", fontsize=12)
     else:
         scatter = ax.scatter(
             vectors[:, 0],
             vectors[:, 1],
             c=color_values,
-            cmap="viridis",
+            cmap=cmap,
             s=50,
-            alpha=0.7,
+            alpha=0.8,
+            edgecolors="black",
+            linewidths=0.5,
             vmin=0,
             vmax=1,
         )
 
     # Set labels
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_title(f"{n_features}D Vector Plot")
+    ax.set_xlabel("X", fontsize=12)
+    ax.set_ylabel("Y", fontsize=12)
+    ax.set_title(f"{n_features}D Vector Plot", fontsize=14, pad=16)
 
-    # Add colorbar with discrete labels
-    cbar = plt.colorbar(scatter, ax=ax, pad=0.1)
-    cbar.set_label("Class", rotation=270, labelpad=20)
+    # Add colorbar or legend based on number of classes
+    if n_classes <= 20:
+        # Create custom legend with actual class labels
+        handles = [
+            plt.Line2D(
+                [0],
+                [0],
+                marker="o",
+                color="w",
+                markerfacecolor=cmap(i / (n_classes - 1) if n_classes > 1 else 0),
+                markersize=8,
+                markeredgecolor="black",
+                markeredgewidth=0.5,
+                label=f"Class {int(label)}",
+            )
+            for i, label in enumerate(unique_labels)
+        ]
+        # Use multiple columns if more than 10 classes
+        ncol = 2 if n_classes > 10 else 1
+        ax.legend(handles=handles, loc="best", framealpha=0.9, ncol=ncol, fontsize=9)
+    else:
+        # Use colorbar for many classes
+        cbar = plt.colorbar(scatter, ax=ax, pad=0.1)
+        cbar.set_label("Class", rotation=270, labelpad=20)
 
-    # Set colorbar ticks at the actual label positions
-    if len(unique_labels) <= 10:
-        tick_positions = (
-            (unique_labels - colors_array.min())
-            / (colors_array.max() - colors_array.min())
-            if colors_array.max() > colors_array.min()
-            else unique_labels
-        )
+        # Set discrete ticks (show up to 15 labels)
+        n_ticks = min(n_classes, 15)
+        tick_positions = np.linspace(0, 1, n_ticks)
         cbar.set_ticks(tick_positions)
-        cbar.set_ticklabels([f"{int(label)}" for label in unique_labels])
+        tick_indices = np.linspace(0, n_classes - 1, n_ticks).astype(int)
+        tick_labels = [f"{int(unique_labels[i])}" for i in tick_indices]
+        cbar.set_ticklabels(tick_labels)
 
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
